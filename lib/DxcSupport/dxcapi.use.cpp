@@ -25,6 +25,7 @@ static void TrimEOL(_Inout_z_ char *pMsg) {
   pEnd[1] = '\0';
 }
 
+#ifdef LLVM_ON_WIN32
 static std::string GetWin32ErrorMessage(DWORD err) {
   char formattedMsg[200];
   DWORD formattedMsgLen =
@@ -36,9 +37,11 @@ static std::string GetWin32ErrorMessage(DWORD err) {
   }
   return std::string();
 }
+#endif
 
 void IFT_Data(HRESULT hr, LPCWSTR data) {
   if (SUCCEEDED(hr)) return;
+#ifdef LLVM_ON_WIN32
   CW2A pData(data, CP_UTF8);
   std::string errMsg;
   if (HRESULT_IS_WIN32ERR(hr)) {
@@ -51,6 +54,11 @@ void IFT_Data(HRESULT hr, LPCWSTR data) {
   if (data != nullptr) {
     errMsg.append(pData);
   }
+#else
+  char mbs[80]; // multibyte string
+  wcstombs(mbs, data, sizeof(mbs));
+  std::string errMsg(mbs);
+#endif
   throw ::hlsl::Exception(hr, errMsg);
 }
 
@@ -103,12 +111,16 @@ void WriteBlobToFile(_In_opt_ IDxcBlob *pBlob, _In_ LPCWSTR pFileName) {
   if (pBlob == nullptr) {
     return;
   }
-
+  #ifdef LLVM_ON_WIN32
   CHandle file(CreateFile2(pFileName, GENERIC_WRITE, FILE_SHARE_READ,
                            CREATE_ALWAYS, nullptr));
   if (file == INVALID_HANDLE_VALUE) {
     IFT_Data(HRESULT_FROM_WIN32(GetLastError()), pFileName);
   }
+  #else
+  std::ofstream outputFile (CW2A(pFileName).c_str(), std::ios::out | std::ios::binary);
+  void *file = static_cast<void*>(&outputFile);
+  #endif
   WriteBlobToHandle(pBlob, file, pFileName);
 }
 
@@ -117,11 +129,18 @@ void WriteBlobToHandle(_In_opt_ IDxcBlob *pBlob, _In_ HANDLE hFile, _In_opt_ LPC
     return;
   }
 
+  #ifdef LLVM_ON_WIN32
   DWORD written;
   if (FALSE == WriteFile(hFile, pBlob->GetBufferPointer(),
     pBlob->GetBufferSize(), &written, nullptr)) {
     IFT_Data(HRESULT_FROM_WIN32(GetLastError()), pFileName);
   }
+  #else
+  std::ofstream *file = static_cast<std::ofstream*>(hFile);
+  assert(file && file->is_open());
+  file->write(static_cast<char*>(pBlob->GetBufferPointer()), pBlob->GetBufferSize());
+  file->close();
+  #endif
 }
 
 void WriteUtf8ToConsole(_In_opt_count_(charCount) const char *pText,
@@ -158,8 +177,15 @@ void WriteUtf8ToConsoleSizeT(_In_opt_count_(charCount) const char *pText,
     return;
   }
 
-  int charCountInt;
+  int charCountInt = 0;
+#ifdef LLVM_ON_WIN32
   IFT(SizeTToInt(charCount, &charCountInt));
+#else
+  if(charCount <= INT_MAX)
+    charCountInt = (int)charCount;
+  else
+    throw ::hlsl::Exception((HRESULT)0x80070216L);
+#endif
   WriteUtf8ToConsole(pText, charCountInt, streamType);
 }
 

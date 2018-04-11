@@ -14,6 +14,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/WinMacros.h"
 #include <cstring>
 
 using namespace llvm;

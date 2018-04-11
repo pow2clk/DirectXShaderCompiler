@@ -60,8 +60,10 @@ void LLVMShutdown() {
   llvm_shutdown();
 }
 
+#ifdef LLVM_ON_WIN32
 // HLSL Change: use ISO _strdup rather than strdup, which compiled but fails to link
 #define strdup _strdup
+#endif
 
 /*===-- Error handling ----------------------------------------------------===*/
 

@@ -20,8 +20,10 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/WinSAL.h"
 #include <cstring>
 #include <limits.h>
+
 
 using namespace llvm;
 

@@ -16,6 +16,8 @@
 
 #include <stdint.h>
 
+#include "llvm/Support/WinSAL.h"
+
 struct IDxcBlob;
 struct IDxcBlobEncoding;
 

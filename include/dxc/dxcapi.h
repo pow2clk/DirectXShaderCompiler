@@ -17,7 +17,14 @@
 #define DXC_API_IMPORT __declspec(dllimport)
 #endif
 
+#ifndef LLVM_ON_WIN32
+#include <dlfcn.h>
+#include "llvm/Support/WinMacros.h"
+#include "llvm/Support/WinSAL.h"
+#endif
+
 struct IMalloc;
+
 struct IDxcIncludeHandler;
 
 /// <summary>
@@ -67,6 +74,9 @@ typedef HRESULT(__stdcall *DxcCreateInstance2Proc)(
 /// <remarks>
 /// While this function is similar to CoCreateInstance, there is no COM involvement.
 /// </remarks>
+#ifndef LLVM_ON_WIN32
+extern "C" {
+#endif
 DXC_API_IMPORT HRESULT __stdcall DxcCreateInstance(
   _In_ REFCLSID   rclsid,
   _In_ REFIID     riid,
@@ -79,6 +89,9 @@ DXC_API_IMPORT HRESULT __stdcall DxcCreateInstance2(
   _In_ REFIID     riid,
   _Out_ LPVOID*   ppv
 );
+#ifndef LLVM_ON_WIN32
+}
+#endif
 
 
 // IDxcBlob is an alias of ID3D10Blob and ID3DBlob
@@ -294,8 +307,16 @@ IDxcVersionInfo : public IUnknown {
   virtual HRESULT STDMETHODCALLTYPE GetFlags(_Out_ UINT32 *pFlags) = 0;
 };
 
+// Note: __declspec(selectany) requires 'extern'
+// On Linux __declspec(selectany) is removed and using 'extern' results in link error.
+#ifdef LLVM_ON_WIN32
+#define EXTERN extern
+#else
+#define EXTERN
+#endif
+
 // {73e22d93-e6ce-47f3-b5bf-f0664f39c1b0}
-__declspec(selectany) extern const CLSID CLSID_DxcCompiler = {
+__declspec(selectany) EXTERN const CLSID CLSID_DxcCompiler = {
   0x73e22d93,
   0xe6ce,
   0x47f3,
@@ -303,7 +324,7 @@ __declspec(selectany) extern const CLSID CLSID_DxcCompiler = {
 };
 
 // {EF6A8087-B0EA-4D56-9E45-D07E1A8B7806}
-__declspec(selectany) extern const GUID CLSID_DxcLinker = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcLinker = {
     0xef6a8087,
     0xb0ea,
     0x4d56,
@@ -311,7 +332,7 @@ __declspec(selectany) extern const GUID CLSID_DxcLinker = {
 };
 
 // {CD1F6B73-2AB0-484D-8EDC-EBE7A43CA09F}
-__declspec(selectany) extern const CLSID CLSID_DxcDiaDataSource = {
+__declspec(selectany) EXTERN const CLSID CLSID_DxcDiaDataSource = {
   0xcd1f6b73,
   0x2ab0,
   0x484d,
@@ -319,7 +340,7 @@ __declspec(selectany) extern const CLSID CLSID_DxcDiaDataSource = {
 };
 
 // {6245D6AF-66E0-48FD-80B4-4D271796748C}
-__declspec(selectany) extern const GUID CLSID_DxcLibrary = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcLibrary = {
   0x6245d6af,
   0x66e0,
   0x48fd,
@@ -327,7 +348,7 @@ __declspec(selectany) extern const GUID CLSID_DxcLibrary = {
 };
 
 // {8CA3E215-F728-4CF3-8CDD-88AF917587A1}
-__declspec(selectany) extern const GUID CLSID_DxcValidator = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcValidator = {
   0x8ca3e215,
   0xf728,
   0x4cf3,
@@ -335,7 +356,7 @@ __declspec(selectany) extern const GUID CLSID_DxcValidator = {
 };
 
 // {D728DB68-F903-4F80-94CD-DCCF76EC7151}
-__declspec(selectany) extern const GUID CLSID_DxcAssembler = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcAssembler = {
   0xd728db68,
   0xf903,
   0x4f80,
@@ -343,7 +364,7 @@ __declspec(selectany) extern const GUID CLSID_DxcAssembler = {
 };
 
 // {b9f54489-55b8-400c-ba3a-1675e4728b91}
-__declspec(selectany) extern const GUID CLSID_DxcContainerReflection = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcContainerReflection = {
   0xb9f54489,
   0x55b8,
   0x400c,
@@ -351,7 +372,7 @@ __declspec(selectany) extern const GUID CLSID_DxcContainerReflection = {
 };
 
 // {AE2CD79F-CC22-453F-9B6B-B124E7A5204C}
-__declspec(selectany) extern const GUID CLSID_DxcOptimizer = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcOptimizer = {
     0xae2cd79f,
     0xcc22,
     0x453f,
@@ -359,7 +380,7 @@ __declspec(selectany) extern const GUID CLSID_DxcOptimizer = {
 };
 
 // {94134294-411f-4574-b4d0-8741e25240d2}
-__declspec(selectany) extern const GUID CLSID_DxcContainerBuilder = {
+__declspec(selectany) EXTERN const GUID CLSID_DxcContainerBuilder = {
   0x94134294,
   0x411f,
   0x4574,  

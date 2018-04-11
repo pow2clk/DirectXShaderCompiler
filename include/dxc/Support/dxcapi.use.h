@@ -23,10 +23,21 @@ protected:
   DxcCreateInstanceProc m_createFn;
   DxcCreateInstance2Proc m_createFn2;
 
+  #ifndef LLVM_ON_WIN32
+  void FreeLibrary(void* handle) {
+    ::dlclose(handle);
+  }
+  HMODULE LoadLibraryW(LPCWSTR name) {
+    return ::dlopen(CW2A(name).c_str(), RTLD_LAZY);
+  }
+  HMODULE GetProcAddress(HMODULE dll, LPCSTR fnName) {
+    return ::dlsym(dll, fnName);
+  }
+  #endif
+
   HRESULT InitializeInternal(LPCWSTR dllName, LPCSTR fnName) {
     if (m_dll != nullptr) return S_OK;
     m_dll = LoadLibraryW(dllName);
-
     if (m_dll == nullptr) return HRESULT_FROM_WIN32(GetLastError());
     m_createFn = (DxcCreateInstanceProc)GetProcAddress(m_dll, fnName);
 
@@ -66,7 +77,11 @@ public:
   }
 
   HRESULT Initialize() {
+    #ifdef LLVM_ON_WIN32
     return InitializeInternal(L"dxcompiler.dll", "DxcCreateInstance");
+    #else
+    return InitializeInternal(L"libdxcompiler.so", "DxcCreateInstance");
+    #endif
   }
 
   HRESULT InitializeForDll(_In_z_ const wchar_t* dll, _In_z_ const char* entryPoint) {

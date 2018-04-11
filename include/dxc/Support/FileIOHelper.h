@@ -9,9 +9,12 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
+
 #pragma once
 
 #include "Global.h"
+#include "llvm/Support/WinMacros.h"
+#include "llvm/Support/WinTypes.h"
 
 #ifndef _ATL_DECLSPEC_ALLOCATOR
 #define _ATL_DECLSPEC_ALLOCATOR

@@ -57,8 +57,10 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
+#ifdef LLVM_ON_WIN32
 #include <dia2.h>
 #include <comdef.h>
+#endif
 #include <algorithm>
 #include <unordered_map>
 
@@ -119,28 +121,48 @@ public:
   }
   virtual void *STDMETHODCALLTYPE Alloc(
     _In_  SIZE_T cb) {
+#ifdef LLVM_ON_WIN32
     return HeapAlloc(m_Handle, 0, cb);
+#else
+    return malloc(cb);
+#endif
   }
 
   virtual void *STDMETHODCALLTYPE Realloc(
     _In_opt_  void *pv,
     _In_  SIZE_T cb)
   {
+#ifdef LLVM_ON_WIN32
     return HeapReAlloc(m_Handle, 0, pv, cb);
+#else
+    return realloc(pv, cb);
+#endif
   }
 
   virtual void STDMETHODCALLTYPE Free(
     _In_opt_  void *pv)
   {
+#ifdef LLVM_ON_WIN32
     HeapFree(m_Handle, 0, pv);
+#else
+    free(pv);
+#endif
   }
-
 
   virtual SIZE_T STDMETHODCALLTYPE GetSize(
     /* [annotation][in] */
     _In_opt_ _Post_writable_byte_size_(return)  void *pv)
   {
+#ifdef LLVM_ON_WIN32
     return HeapSize(m_Handle, 0, pv);
+#else
+    // Note: There is no way to get the size of the dynamically allocated memory
+    // from the pointer in Linux. Therefore, we'd need to add a member variable
+    // to this class to keep track of the size. Not needed yet.
+    assert(false &&
+           "Can't get the size of dynamically allocated memory from pointer.");
+    return 0;
+#endif
   }
 
   virtual int STDMETHODCALLTYPE DidAlloc(
@@ -159,7 +181,6 @@ public:
 inline bool wcseq(LPCWSTR a, LPCWSTR b) {
   return (a == nullptr && b == nullptr) || (a != nullptr && b != nullptr && wcscmp(a, b) == 0);
 }
-inline bool wcsieq(LPCWSTR a, LPCWSTR b) { return _wcsicmp(a, b) == 0; }
 
 using namespace dxc;
 using namespace llvm::opt;
@@ -180,9 +201,13 @@ private:
   void WriteHeader(IDxcBlobEncoding *pDisassembly, IDxcBlob *pCode,
                    llvm::Twine &pVariableName, LPCWSTR pPath);
   HRESULT ReadFileIntoPartContent(hlsl::DxilFourCC fourCC, LPCWSTR fileName, IDxcBlob **ppResult);
-  
+
+// Dia is only supported on Windows.
+#ifdef LLVM_ON_WIN32
   // TODO : Refactor two functions below. There are duplicate functions in DxcContext in dxa.cpp
   HRESULT GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob, IDiaTable **ppTable, LPCWSTR tableName);
+#endif
+
   HRESULT FindModuleBlob(hlsl::DxilFourCC fourCC, IDxcBlob *pSource, IDxcLibrary *pLibrary, IDxcBlob **ppTargetBlob);
   void ExtractRootSignature(IDxcBlob *pBlob, IDxcBlob **ppResult);
   int VerifyRootSignature();
@@ -199,9 +224,15 @@ public:
   DxcContext(DxcOpts &Opts, DxcDllSupport &dxcSupport)
       : m_Opts(Opts), m_dxcSupport(dxcSupport), m_MallocHeap(nullptr) {
     if (m_dxcSupport.HasCreateWithMalloc()) {
+      #ifdef LLVM_ON_WIN32
       m_MallocHeap = HeapCreate(HEAP_NO_SERIALIZE, 1024 * 1024 * 2, 0);
       if (m_MallocHeap == NULL)
         IFT_Data(HRESULT_FROM_WIN32(GetLastError()), L"unable to create custom heap");
+      #else
+      m_MallocHeap = malloc(1024 * 1024 * 2);
+      if (!m_MallocHeap)
+        IFT_Data(-1, L"unable to create custom heap");
+      #endif
       m_Malloc.SetHandle(m_MallocHeap);
       // We never free the heap because it's tied to the dxc process lifetime
     }
@@ -234,6 +265,8 @@ static void WritePartToFile(IDxcBlob *pBlob, hlsl::DxilFourCC CC,
 
   const char *pData = hlsl::GetDxilPartData(*it);
   DWORD dataLen = (*it)->PartSize;
+
+  #ifdef LLVM_ON_WIN32
   StringRefUtf16 WideName(FName);
   CHandle file(CreateFile2(WideName, GENERIC_WRITE, FILE_SHARE_READ,
                            CREATE_ALWAYS, nullptr));
@@ -244,6 +277,11 @@ static void WritePartToFile(IDxcBlob *pBlob, hlsl::DxilFourCC CC,
   if (FALSE == WriteFile(file, pData, dataLen, &written, nullptr)) {
     IFT_Data(HRESULT_FROM_WIN32(GetLastError()), WideName);
   }
+  #else
+  std::ofstream file(FName, std::ios::out | std::ios::binary);
+  file.write(static_cast<const char*>(pData), dataLen);
+  file.close();
+  #endif
 }
 
 // This function is called either after the compilation is done or /dumpbin option is provided
@@ -473,7 +511,6 @@ HRESULT DxcContext::ReadFileIntoPartContent(hlsl::DxilFourCC fourCC, LPCWSTR fil
 // Right now IDxcContainerBuilder assumes that we are building a full dxil container,
 // but we are building a container with only rootsignature part
 void DxcContext::ExtractRootSignature(IDxcBlob *pBlob, IDxcBlob **ppResult) {
-  
   DXASSERT_NOMSG(pBlob != nullptr && ppResult != nullptr);
   const hlsl::DxilContainerHeader *pHeader = (hlsl::DxilContainerHeader *)(pBlob->GetBufferPointer());
   IFTBOOL(hlsl::IsValidDxilContainer(pHeader, pHeader->ContainerSizeInBytes), DXC_E_CONTAINER_INVALID);
@@ -575,7 +612,14 @@ public:
 
   HRESULT insertIncludeFile(_In_ LPCWSTR pFilename, _In_ IDxcBlobEncoding *pBlob, _In_ UINT32 dataLen) {
     try {
+      #ifdef LLVM_ON_WIN32
       includeFiles.try_emplace(std::wstring(pFilename), pBlob);
+      #else
+      // Note: try_emplace is only available in C++17 on Linux.
+      // try_emplace does nothing if the key already exists in the map.
+      if(includeFiles.find(std::wstring(pFilename)) != includeFiles.end())
+        includeFiles.emplace(std::wstring(pFilename), pBlob);
+      #endif
     }
     CATCH_CPP_RETURN_HRESULT()
     return S_OK;
@@ -595,6 +639,8 @@ public:
 };
 
 void DxcContext::Recompile(IDxcBlob *pSource, IDxcLibrary *pLibrary, IDxcCompiler *pCompiler, std::vector<LPCWSTR> &args, IDxcOperationResult **ppCompileResult) {
+// Recompile currently only supported on Windows
+#ifdef LLVM_ON_WIN32
   CComPtr<IDxcBlob> pTargetBlob;
   IFT(FindModuleBlob(hlsl::DxilFourCC::DFCC_ShaderDebugInfoDXIL, pSource, pLibrary, &pTargetBlob));
   // Retrieve necessary data from DIA symbols for recompiling
@@ -745,6 +791,7 @@ void DxcContext::Recompile(IDxcBlob *pSource, IDxcLibrary *pLibrary, IDxcCompile
     ConcatArgs.size(), ConcatDefines.data(),
     ConcatDefines.size(), pIncludeHandler, &pResult));
   *ppCompileResult = pResult.Detach();
+#endif // LLVM_ON_WIN32
 }
 
 int DxcContext::Compile() {
@@ -871,18 +918,30 @@ void DxcContext::Preprocess() {
 }
 
 static void WriteString(HANDLE hFile, _In_z_ LPCSTR value, LPCWSTR pFileName) {
+  #ifdef LLVM_ON_WIN32
   DWORD written;
   if (FALSE == WriteFile(hFile, value, strlen(value) * sizeof(value[0]), &written, nullptr))
     IFT_Data(HRESULT_FROM_WIN32(GetLastError()), pFileName);
+  #else
+  std::ofstream *file = static_cast<std::ofstream*>(hFile);
+  assert(file && file->is_open());
+  file->write(value, strlen(value));
+  file->close();
+  #endif
 }
 
 void DxcContext::WriteHeader(IDxcBlobEncoding *pDisassembly, IDxcBlob *pCode,
                              llvm::Twine &pVariableName, LPCWSTR pFileName) {
+  #ifdef LLVM_ON_WIN32
   CHandle file(CreateFile2(pFileName, GENERIC_WRITE, FILE_SHARE_READ,
                            CREATE_ALWAYS, nullptr));
   if (file == INVALID_HANDLE_VALUE) {
     IFT_Data(HRESULT_FROM_WIN32(GetLastError()), pFileName);
   }
+  #else
+  std::ofstream outputFile (CW2A(pFileName).c_str(), std::ios::out | std::ios::binary);
+  void *file = static_cast<void*>(&outputFile);
+  #endif
 
   {
     std::string s;
@@ -955,7 +1014,9 @@ HRESULT DxcContext::FindModuleBlob(hlsl::DxilFourCC fourCC, IDxcBlob *pSource, I
   return E_INVALIDARG;
 }
 
-// TODO : There is an identical code in DxaContext in Dxa.cpp. Refactor this function.
+// This function is currently only supported on Windows due to usage of
+// IDiaTable.
+#ifdef LLVM_ON_WIN32
 HRESULT DxcContext::GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob, IDiaTable **ppTable, LPCWSTR tableName) {
   if (!pLibrary || !pTargetBlob || !ppTable)
     return E_INVALIDARG;
@@ -986,8 +1047,10 @@ HRESULT DxcContext::GetDxcDiaTable(IDxcLibrary *pLibrary, IDxcBlob *pTargetBlob,
   *ppTable = pTable.Detach();
   return S_OK;
 }
+#endif
 
 bool GetDLLFileVersionInfo(const char *dllPath, unsigned int *version) {
+  #ifdef LLVM_ON_WIN32
   DWORD dwVerHnd = 0;
   DWORD size = GetFileVersionInfoSize(dllPath, &dwVerHnd);
   if (size == 0) return false;
@@ -1007,6 +1070,11 @@ bool GetDLLFileVersionInfo(const char *dllPath, unsigned int *version) {
       }
   }
   return false;
+  #else
+  // This function is used to get version information from the DLL file.
+  // This information in is not available through a Unix interface.
+  return false;
+  #endif
 }
 
 // Collects compiler/validator version info
@@ -1064,14 +1132,17 @@ void DxcContext::GetCompilerVersionInfo(llvm::raw_string_ostream &OS) {
   }
 }
 
+#ifdef LLVM_ON_WIN32
 int __cdecl wmain(int argc, const wchar_t **argv_) {
+#else
+int main(int argc, const char **argv_) {
+#endif
   const char *pStage = "Operation";
   int retVal = 0;
   if (FAILED(DxcInitThreadMalloc())) return 1;
   DxcSetThreadMallocOrDefault(nullptr);
   try {
     pStage = "Argument processing";
-
     if (initHlslOptTable()) throw std::bad_alloc();
 
     // Parse command line options.
@@ -1088,7 +1159,7 @@ int __cdecl wmain(int argc, const wchar_t **argv_) {
           ReadDxcOpts(optionTable, DxcFlags, argStrings, dxcOpts, errorStream);
       errorStream.flush();
       if (errorString.size()) {
-        fprintf(stderr, "dxc failed : %s", errorString.data());
+        fprintf(stderr, "dxc failed : %s\n", errorString.data());
       }
       if (optResult != 0) {
         return optResult;
@@ -1107,7 +1178,7 @@ int __cdecl wmain(int argc, const wchar_t **argv_) {
       int dllResult = SetupDxcDllSupport(dxcOpts, dxcSupport, dllErrorStream);
       dllErrorStream.flush();
       if (dllErrorString.size()) {
-        fprintf(stderr, "%s", dllErrorString.data());
+        fprintf(stderr, "%s\n", dllErrorString.data());
       }
       if (dllResult)
         return dllResult;

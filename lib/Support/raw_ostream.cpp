@@ -23,6 +23,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/WinSAL.h"
 #include <cctype>
 #include <cerrno>
 #include <sys/stat.h>

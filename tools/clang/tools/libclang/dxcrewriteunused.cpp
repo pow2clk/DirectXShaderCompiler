@@ -97,10 +97,14 @@ public:
 
 static void raw_string_ostream_to_CoString(raw_string_ostream &o, _Outptr_result_z_ LPSTR *pResult) {
   std::string& s = o.str(); // .str() will flush automatically
+  #ifdef LLVM_ON_WIN32
   *pResult = (LPSTR)CoTaskMemAlloc(s.size() + 1);
+  #else
+  *pResult = (LPSTR)malloc(s.size() + 1);
+  #endif
   if (*pResult == nullptr) 
     throw std::bad_alloc();
-  strcpy_s(*pResult, s.size() + 1, s.c_str());
+  strncpy(*pResult, s.c_str(), s.size() + 1);
 }
 
 static
@@ -574,7 +578,6 @@ public:
       ::llvm::sys::fs::MSFileSystem* msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -617,7 +620,6 @@ public:
       ::llvm::sys::fs::MSFileSystem* msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -666,7 +668,6 @@ public:
     try {
       dxcutil::DxcArgsFileSystem *msfPtr = dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 

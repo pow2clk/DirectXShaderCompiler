@@ -18,6 +18,9 @@
 #include "dxc/Support/Global.h"
 #include "dxc/Support/WinIncludes.h"
 #include "HLSLRootSignature.h"
+
+#include <float.h>
+
 using namespace llvm;
 using namespace hlsl;
 

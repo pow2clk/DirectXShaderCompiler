@@ -43,13 +43,21 @@ public:
       m_length = 0;
     }
     if (m_pData) {
+      #ifdef LLVM_ON_WIN32
       CoTaskMemFree(m_pData);
+      #else
+      free(m_pData);
+      #endif
       m_pData = nullptr;
     }
   }
   HRESULT alloc(unsigned count) {
     clear();
+    #ifdef LLVM_ON_WIN32
     m_pData = (TIface**)CoTaskMemAlloc(sizeof(TIface*) * count);
+    #else
+    m_pData = malloc(sizeof(TIface*) * count);
+    #endif
     if (m_pData == nullptr)
       return E_OUTOFMEMORY;
     m_length = count;
@@ -101,33 +109,42 @@ void DxcCallDestructor(T *obj) {
 
 // The "TM" version keep an IMalloc field that, if not null, indicate
 // ownership of 'this' and of any allocations used during release.
-#define DXC_MICROCOM_TM_REF_FIELDS() \
-  volatile ULONG m_dwRef = 0;\
+#define DXC_MICROCOM_TM_REF_FIELDS()                                           \
+  volatile ULONG m_dwRef = 0;                                                  \
   CComPtr<IMalloc> m_pMalloc;
-#define DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL() \
-    DXC_MICROCOM_ADDREF_IMPL(m_dwRef) \
-    ULONG STDMETHODCALLTYPE Release() { \
-      ULONG result = InterlockedDecrement(&m_dwRef); \
-      if (result == 0) { \
-        CComPtr<IMalloc> pTmp(m_pMalloc); \
-        DxcThreadMalloc M(pTmp); \
-        DxcCallDestructor(this); \
-        pTmp->Free(this); \
-      } \
-      return result; \
-    }
-#define DXC_MICROCOM_TM_CTOR(T) \
-  DXC_MICROCOM_TM_CTOR_ONLY(T) \
+
+#define DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL()                                  \
+  DXC_MICROCOM_ADDREF_IMPL(m_dwRef)                                            \
+  ULONG STDMETHODCALLTYPE Release() {                                          \
+    ULONG result = InterlockedDecrement(&m_dwRef);                             \
+    if (result == 0) {                                                         \
+      CComPtr<IMalloc> pTmp(m_pMalloc);                                        \
+      DxcThreadMalloc M(pTmp);                                                 \
+      DxcCallDestructor(this);                                                 \
+      pTmp->Free(this);                                                        \
+    }                                                                          \
+    return result;                                                             \
+  }
+
+#define DXC_MICROCOM_TM_CTOR(T)                                                \
+  DXC_MICROCOM_TM_CTOR_ONLY(T)                                                 \
   DXC_MICROCOM_TM_ALLOC(T)
-#define DXC_MICROCOM_TM_CTOR_ONLY(T) \
-  T(IMalloc *pMalloc) : m_dwRef(0), m_pMalloc(pMalloc) { }
-#define DXC_MICROCOM_TM_ALLOC(T) \
-  template <typename... Args> \
-  static T* Alloc(IMalloc *pMalloc, Args&&... args) { \
-    void *P = pMalloc->Alloc(sizeof(T)); \
-    try { if (P) new (P)T(pMalloc, std::forward<Args>(args)...); } \
-    catch (...) { pMalloc->Free(P); throw; } \
-    return (T *)P; \
+
+#define DXC_MICROCOM_TM_CTOR_ONLY(T)                                           \
+  T(IMalloc *pMalloc) : m_dwRef(0), m_pMalloc(pMalloc) {}
+
+#define DXC_MICROCOM_TM_ALLOC(T)                                               \
+  template <typename... Args>                                                  \
+  static T *Alloc(IMalloc *pMalloc, Args &&... args) {                         \
+    void *P = pMalloc->Alloc(sizeof(T));                                       \
+    try {                                                                      \
+      if (P)                                                                   \
+        new (P) T(pMalloc, std::forward<Args>(args)...);                       \
+    } catch (...) {                                                            \
+      pMalloc->Free(P);                                                        \
+      throw;                                                                   \
+    }                                                                          \
+    return (T *)P;                                                             \
   }
 
 /// <summary>
@@ -143,6 +160,7 @@ template<typename TObject>
 HRESULT DoBasicQueryInterface_recurse(TObject* self, REFIID iid, void** ppvObject) {
   return E_NOINTERFACE;
 }
+
 template<typename TObject, typename TInterface, typename... Ts>
 HRESULT DoBasicQueryInterface_recurse(TObject* self, REFIID iid, void** ppvObject) {
   if (ppvObject == nullptr) return E_POINTER;

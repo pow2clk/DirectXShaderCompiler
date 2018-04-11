@@ -1,6 +1,9 @@
 ﻿# Copyright (C) Microsoft Corporation. All rights reserved.
 # This file is distributed under the University of Illinois Open Source License. See LICENSE.TXT for details.
-find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+
+if (WIN32)
+  find_package(DiaSDK REQUIRED) # Used for constants and declarations.
+endif (WIN32)
 
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
@@ -37,6 +40,7 @@ set(LLVM_LINK_COMPONENTS
   vectorize
   )
 
+if (WIN32)
 set(SOURCES
   dxcapi.cpp
   dxcassembler.cpp
@@ -53,7 +57,28 @@ set(SOURCES
   dxcutil.cpp
   dxcdisassembler.cpp
   dxclinker.cpp
-  )
+)
+else ()
+set(SOURCES
+  dxcapi.cpp
+  dxcassembler.cpp
+  dxclibrary.cpp
+  dxcompilerobj.cpp
+  dxcfilesystem.cpp
+  dxcontainerbuilder.cpp
+  dxcutil.cpp
+  dxcdisassembler.cpp
+  dxillib.cpp
+  dxcvalidator.cpp
+)
+set (HLSL_IGNORE_SOURCES
+  dxcdia.cpp
+  DXCompiler.cpp
+  DXCompiler.rc
+  DXCompiler.def
+  dxclinker.cpp
+)
+endif(WIN32)
 
 set(LIBRARIES
   clangIndex
@@ -86,14 +111,24 @@ set(GENERATED_HEADERS
   )
 
 add_clang_library(dxcompiler SHARED ${SOURCES})
-target_link_libraries(dxcompiler PRIVATE ${LIBRARIES} ${DIASDK_LIBRARIES})
+if (WIN32) # SPIRV change
+  target_link_libraries(dxcompiler PRIVATE ${LIBRARIES} ${DIASDK_LIBRARIES})
 # SPIRV change starts
-if (ENABLE_SPIRV_CODEGEN)
-  target_link_libraries(dxcompiler PRIVATE clangSPIRV)
-endif (ENABLE_SPIRV_CODEGEN)
+  if (ENABLE_SPIRV_CODEGEN)
+    target_link_libraries(dxcompiler PRIVATE clangSPIRV)
+  endif (ENABLE_SPIRV_CODEGEN)
 # SPIRV change ends
-add_dependencies(dxcompiler DxcEtw)
-include_directories(AFTER ${LLVM_INCLUDE_DIR}/dxc/Tracing ${DIASDK_INCLUDE_DIRS})
+  add_dependencies(dxcompiler DxcEtw)
+  include_directories(AFTER ${LLVM_INCLUDE_DIR}/dxc/Tracing ${DIASDK_INCLUDE_DIRS})
+# SPIRV change starts
+else ()
+  target_link_libraries(dxcompiler PRIVATE ${LIBRARIES})
+  if (ENABLE_SPIRV_CODEGEN)
+    target_link_libraries(dxcompiler PRIVATE clangSPIRV)
+  endif (ENABLE_SPIRV_CODEGEN)
+  include_directories(AFTER ${LLVM_INCLUDE_DIR}/dxc/Tracing)
+endif (WIN32)
+# SPIRV change ends
 
 set_target_properties(dxcompiler
   PROPERTIES

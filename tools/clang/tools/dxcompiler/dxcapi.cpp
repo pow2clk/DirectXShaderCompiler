@@ -16,7 +16,9 @@
 #include "dxc/dxcisense.h"
 #include "dxc/dxctools.h"
 #include "dxc/Support/Global.h"
+#ifdef LLVM_ON_WIN32
 #include "dxcetw.h"
+#endif
 #include "dxillib.h"
 #include <memory>
 
@@ -53,13 +55,7 @@ static HRESULT ThreadMallocDxcCreateInstance(
                   _Out_ LPVOID   *ppv) {
   HRESULT hr = S_OK;
   *ppv = nullptr;
-  if (IsEqualCLSID(rclsid, CLSID_DxcIntelliSense)) {
-    hr = CreateDxcIntelliSense(riid, ppv);
-  }
-  else if (IsEqualCLSID(rclsid, CLSID_DxcRewriter)) {
-    hr = CreateDxcRewriter(riid, ppv);
-  }
-  else if (IsEqualCLSID(rclsid, CLSID_DxcCompiler)) {
+  if (IsEqualCLSID(rclsid, CLSID_DxcCompiler)) {
     hr = CreateDxcCompiler(riid, ppv);
   }
   else if (IsEqualCLSID(rclsid, CLSID_DxcLibrary)) {
@@ -78,6 +74,14 @@ static HRESULT ThreadMallocDxcCreateInstance(
   else if (IsEqualCLSID(rclsid, CLSID_DxcOptimizer)) {
     hr = CreateDxcOptimizer(riid, ppv);
   }
+// Note: The following targets are not yet enabled for non-Windows platforms.
+#ifdef LLVM_ON_WIN32
+  else if (IsEqualCLSID(rclsid, CLSID_DxcIntelliSense)) {
+    hr = CreateDxcIntelliSense(riid, ppv);
+  }
+  else if (IsEqualCLSID(rclsid, CLSID_DxcRewriter)) {
+    hr = CreateDxcRewriter(riid, ppv);
+  }
   else if (IsEqualCLSID(rclsid, CLSID_DxcDiaDataSource)) {
     hr = CreateDxcDiaDataSource(riid, ppv);
   }
@@ -90,6 +94,7 @@ static HRESULT ThreadMallocDxcCreateInstance(
   else if (IsEqualCLSID(rclsid, CLSID_DxcContainerBuilder)) {
     hr = CreateDxcContainerBuilder(riid, ppv);
   }
+#endif
   else {
     hr = REGDB_E_CLASSNOTREG;
   }

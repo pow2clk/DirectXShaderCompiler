@@ -24,6 +24,7 @@ typedef _Return_type_success_(return >= 0) long HRESULT;
 
 #include <stdarg.h>
 #include "dxc/Support/exception.h"
+#include "llvm/Support/WinSAL.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Memory allocation support.
@@ -126,6 +127,8 @@ template<typename T> T *VerifyNullAndThrow(T *p) {
 }
 #define VNT(__p) VerifyNullAndThrow(__p)
 
+#ifdef LLVM_ON_WIN32
+
 extern "C" __declspec(dllimport) void __stdcall OutputDebugStringA(_In_opt_ const char *msg);
 
 inline void OutputDebugBytes(const void *ptr, size_t len) {
@@ -171,7 +174,11 @@ inline void OutputDebugFormatA(_In_ _Printf_format_string_ _Null_terminated_ con
   }
 }
 
+#endif
+
 #ifdef DBG
+
+#ifdef LLVM_ON_WIN32
 
 // DXASSERT is used to debug break when 'exp' evaluates to false and is only
 //     intended for internal developer use. It is compiled out in free
@@ -196,6 +203,15 @@ inline void OutputDebugFormatA(_In_ _Printf_format_string_ _Null_terminated_ con
 #define DXASSERT_NOMSG(exp) DXASSERT(exp, "")
 
 #define DXVERIFY_NOMSG(exp) DXASSERT(exp, "")
+
+#else
+#include <cassert>
+#define DXASSERT_NOMSG assert
+#define DXASSERT(expr, msg) do { if (!(expr)) { assert(false && msg); } } while (0);
+#define DXASSERT_LOCALVAR(local, exp, msg) DXASSERT(exp, msg)
+#define DXVERIFY_NOMSG assert
+#define DXASSERT(expr, fmt, ...) do { if (!(expr)) { char msg[80]; sprintf(msg, fmt, ##__VA_ARGS__); assert(false && msg); } } while (0);
+#endif
 
 #else
 

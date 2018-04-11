@@ -18,6 +18,8 @@
 #include "llvm/Support/DataTypes.h"
 #include <stddef.h>
 
+#include "llvm/Support/WinSAL.h"
+
 /**
  * @defgroup LLVMCDisassembler Disassembler
  * @ingroup LLVMC

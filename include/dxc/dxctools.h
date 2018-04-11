@@ -49,8 +49,14 @@ IDxcRewriter : public IUnknown {
 
 };
 
+#ifdef LLVM_ON_WIN32
+#define EXTERN extern
+#else
+#define EXTERN
+#endif
+
 __declspec(selectany)
-extern const CLSID CLSID_DxcRewriter = { /* b489b951-e07f-40b3-968d-93e124734da4 */
+EXTERN const CLSID CLSID_DxcRewriter = { /* b489b951-e07f-40b3-968d-93e124734da4 */
   0xb489b951,
   0xe07f,
   0x40b3,

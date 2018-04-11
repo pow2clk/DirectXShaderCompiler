@@ -20,9 +20,16 @@
 #include "llvm/TableGen/Record.h"
 #include "llvm/TableGen/SetTheory.h"
 
+#ifdef LLVM_ON_WIN32
+#include <windows.h>
+#else
+#include "llvm/Support/WinTypes.h"
+#include "llvm/Support/WinMacros.h"
+#include "llvm/Support/WinSAL.h"
+#endif
+
 // HLSL Change Starts
 #define NOMINMAX
-#include <windows.h>
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MSFileSystem.h"
 // HLSL Change Ends

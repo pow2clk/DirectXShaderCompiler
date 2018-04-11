@@ -137,6 +137,7 @@ public:
   bool hasCodeCompletionSupport() const override { return true; }
 };
 
+#if 0 // SPIRV change - no support for modules or PCH
 /// \brief Dump information about the given module file, to be used for
 /// basic debugging and discovery.
 class DumpModuleInfoAction : public ASTFrontendAction {
@@ -162,6 +163,7 @@ protected:
 public:
   bool hasCodeCompletionSupport() const override { return false; }
 };
+#endif // SPIRV changes
 
 /**
  * \brief Frontend action adaptor that merges ASTs together.
@@ -254,7 +256,7 @@ protected:
   void ExecuteAction() override;
 
 public:
-  HLSLRootSignatureAction(StringRef rootSigMacro, unsigned major,
+  HLSLRootSignatureAction(llvm::StringRef rootSigMacro, unsigned major,
                           unsigned minor);
   /// Take the generated LLVM module, for use after the action has been run.
   /// The result may be null on failure.

@@ -49,7 +49,9 @@
 #include "dxc/Support/dxcapi.impl.h"
 #include "dxc/Support/DxcLangExtensionsHelper.h"
 #include "dxc/Support/HLSLOptions.h"
+#ifdef LLVM_ON_WIN32
 #include "dxcetw.h"
+#endif
 #include "dxillib.h"
 #include <algorithm>
 
@@ -317,8 +319,8 @@ public:
       CComPtr<IDxcBlob> pOutputBlob;
       dxcutil::DxcArgsFileSystem *msfPtr =
         dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
-      std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
 
+      std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -625,7 +627,6 @@ public:
       CComPtr<AbstractMemoryStream> pOutputStream;
       dxcutil::DxcArgsFileSystem *msfPtr = dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -733,7 +734,6 @@ public:
       ::llvm::sys::fs::MSFileSystem *msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 

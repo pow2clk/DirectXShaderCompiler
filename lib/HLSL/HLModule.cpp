@@ -26,7 +26,9 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/WinMacros.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
+
 
 using namespace llvm;
 using std::string;

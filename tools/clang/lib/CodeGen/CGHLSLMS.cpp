@@ -2019,6 +2019,18 @@ hlsl::GetResourceClassForType(const clang::ASTContext &context,
   return hlsl::DxilResourceBase::Class::Invalid;
 }
 
+static DxilSampler::SamplerKind KeywordToSamplerKind(const std::string &keyword) {
+  // TODO: refactor for faster search (switch by 1/2/3 first letters, then
+  // compare)
+  if (keyword == "SamplerState")
+    return DxilSampler::SamplerKind::Default;
+
+  if (keyword == "SamplerComparisonState")
+    return DxilSampler::SamplerKind::Comparison;
+
+  return DxilSampler::SamplerKind::Invalid;
+}
+
 hlsl::DxilResourceBase::Class CGMSHLSLRuntime::TypeToClass(clang::QualType Ty) {
   return hlsl::GetResourceClassForType(CGM.getContext(), Ty);
 }

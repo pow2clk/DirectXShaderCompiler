@@ -39,6 +39,7 @@ namespace {
 #endif
 #endif
 
+#ifdef LLVM_ON_WIN32
 #ifdef DBG
 
 // This should be improved with global enabled mask rather than a compile-time mask.
@@ -58,6 +59,11 @@ namespace {
 #define DXTRACE_FMT_APIFS(...)
 
 #endif // DBG
+#else  // LLVM_ON_WIN32
+#define DXTRACE_FMT_APIFS(...)
+#define OutputDebugStringA(...);
+#endif // LLVM_ON_WIN32
+
 
 
 enum class HandleKind {
@@ -139,6 +145,13 @@ bool IsAbsoluteOrCurDirRelativeW(LPCWSTR Path) {
   if (Path[0] == L'\\') {
     return Path[1] == L'\\';
   }
+
+  #ifndef LLVM_ON_WIN32
+  // Absolute paths on unix systems start with '/'
+  if (Path[0] == L'/') {
+    return TRUE;
+  }
+  #endif
 
   //
   // NOTE: there are a number of cases we don't handle, as they don't play well with the simple
@@ -366,7 +379,7 @@ public:
     }
     for (unsigned i = 0, e = entries.size(); i != e; ++i) {
       const clang::HeaderSearchOptions::Entry &E = entries[i];
-      if (IsAbsoluteOrCurDirRelative(E.Path.c_str())) {
+      if (dxcutil::IsAbsoluteOrCurDirRelative(E.Path.c_str())) {
         m_searchEntries.emplace_back(Unicode::UTF8ToUTF16StringOrThrow(E.Path.c_str()));
       }
       else {
@@ -472,7 +485,6 @@ public:
       lpFileInformation->nFileIndexHigh = 1;
       return TRUE;
     }
-
     SetLastError(ERROR_INVALID_HANDLE);
     return FALSE;
   }

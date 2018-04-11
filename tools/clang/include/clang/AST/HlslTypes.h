@@ -22,6 +22,8 @@
 #include "llvm/Support/Casting.h"
 #include "dxc/HLSL/DxilConstants.h"
 
+#include "llvm/Support/WinSAL.h"
+
 namespace clang {
   class ASTContext;
   class AttributeList;
@@ -33,6 +35,7 @@ namespace clang {
   class FunctionTemplateDecl;
   class InheritableAttr;
   class NamedDecl;
+  class Sema;
   class TypeSourceInfo;
   class TypedefDecl;
 }

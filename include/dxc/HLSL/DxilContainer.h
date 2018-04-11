@@ -19,6 +19,9 @@
 #include <functional>
 #include "dxc/HLSL/DxilConstants.h"
 
+#include "llvm/Support/WinTypes.h"
+#include "llvm/Support/WinSAL.h"
+
 struct IDxcContainerReflection;
 namespace llvm { class Module; }
 
