@@ -408,6 +408,15 @@ SpirvEvalInfo DeclResultIdMapper::createExternVar(const VarDecl *var) {
 
   uint32_t varType = typeTranslator.translateType(var->getType(), rule);
 
+  // Require corresponding capability for accessing 16-bit data.
+  if (storageClass == spv::StorageClass::Uniform &&
+      spirvOptions.enable16BitTypes &&
+      typeTranslator.isOrContains16BitType(var->getType())) {
+    theBuilder.addExtension(Extension::KHR_16bit_storage,
+                            "16-bit types in resource", var->getLocation());
+    theBuilder.requireCapability(spv::Capability::StorageUniformBufferBlock16);
+  }
+
   const uint32_t id = theBuilder.addModuleVar(varType, storageClass,
                                               var->getName(), llvm::None);
   const auto info =
@@ -473,6 +482,7 @@ uint32_t DeclResultIdMapper::createStructOrStructArrayVarOfExplicitLayout(
   const bool forCBuffer = usageKind == ContextUsageKind::CBuffer;
   const bool forTBuffer = usageKind == ContextUsageKind::TBuffer;
   const bool forGlobals = usageKind == ContextUsageKind::Globals;
+  const bool forPC = usageKind == ContextUsageKind::PushConstant;
 
   auto &context = *theBuilder.getSPIRVContext();
   const LayoutRule layoutRule =
@@ -506,6 +516,19 @@ uint32_t DeclResultIdMapper::createStructOrStructArrayVarOfExplicitLayout(
     fieldTypes.push_back(typeTranslator.translateType(varType, layoutRule));
     fieldNames.push_back(declDecl->getName());
 
+    // Require corresponding capability for accessing 16-bit data.
+    if (spirvOptions.enable16BitTypes &&
+        typeTranslator.isOrContains16BitType(varType)) {
+      theBuilder.addExtension(Extension::KHR_16bit_storage,
+                              "16-bit types in resource",
+                              declDecl->getLocation());
+      theBuilder.requireCapability(
+          (forCBuffer || forGlobals)
+              ? spv::Capability::StorageUniform16
+              : forPC ? spv::Capability::StoragePushConstant16
+                      : spv::Capability::StorageUniformBufferBlock16);
+    }
+
     // tbuffer/TextureBuffers are non-writable SSBOs. OpMemberDecorate
     // NonWritable must be applied to all fields.
     if (forTBuffer) {
@@ -534,9 +557,8 @@ uint32_t DeclResultIdMapper::createStructOrStructArrayVarOfExplicitLayout(
   // Register the <type-id> for this decl
   ctBufferPCTypeIds[decl] = resultType;
 
-  const auto sc = usageKind == ContextUsageKind::PushConstant
-                      ? spv::StorageClass::PushConstant
-                      : spv::StorageClass::Uniform;
+  const auto sc =
+      forPC ? spv::StorageClass::PushConstant : spv::StorageClass::Uniform;
 
   // Create the variable for the whole struct / struct array.
   return theBuilder.addModuleVar(resultType, sc, varName);
@@ -657,11 +679,12 @@ void DeclResultIdMapper::createGlobalsCBuffer(const VarDecl *var) {
   uint32_t index = 0;
   for (const auto *decl : typeTranslator.collectDeclsInDeclContext(context))
     if (const auto *varDecl = dyn_cast<VarDecl>(decl)) {
-      if (const auto *init = varDecl->getInit()) {
-        emitWarning(
-            "variable '%0' will be placed in $Globals so initializer ignored",
-            init->getExprLoc())
-            << var->getName() << init->getSourceRange();
+      if (!spirvOptions.noWarnIgnoredFeatures) {
+        if (const auto *init = varDecl->getInit())
+          emitWarning(
+              "variable '%0' will be placed in $Globals so initializer ignored",
+              init->getExprLoc())
+              << var->getName() << init->getSourceRange();
       }
       if (const auto *attr = varDecl->getAttr<VKBindingAttr>()) {
         emitError("variable '%0' will be placed in $Globals so cannot have "
@@ -2147,15 +2170,22 @@ uint32_t DeclResultIdMapper::createSpirvStageVar(StageVar *stageVar,
   case hlsl::Semantic::Kind::RenderTargetArrayIndex: {
     switch (sigPointKind) {
     case hlsl::SigPoint::Kind::VSIn:
-    case hlsl::SigPoint::Kind::VSOut:
     case hlsl::SigPoint::Kind::HSCPIn:
     case hlsl::SigPoint::Kind::HSCPOut:
     case hlsl::SigPoint::Kind::PCOut:
     case hlsl::SigPoint::Kind::DSIn:
     case hlsl::SigPoint::Kind::DSCPIn:
-    case hlsl::SigPoint::Kind::DSOut:
     case hlsl::SigPoint::Kind::GSVIn:
       return theBuilder.addStageIOVar(type, sc, name.str());
+    case hlsl::SigPoint::Kind::VSOut:
+    case hlsl::SigPoint::Kind::DSOut:
+      theBuilder.addExtension(Extension::EXT_shader_viewport_index_layer,
+                              "SV_RenderTargetArrayIndex", srcLoc);
+      theBuilder.requireCapability(
+          spv::Capability::ShaderViewportIndexLayerEXT);
+
+      stageVar->setIsSpirvBuiltin();
+      return theBuilder.addStageBuiltinVar(type, sc, BuiltIn::Layer);
     case hlsl::SigPoint::Kind::GSOut:
     case hlsl::SigPoint::Kind::PSIn:
       theBuilder.requireCapability(spv::Capability::Geometry);
@@ -2173,15 +2203,22 @@ uint32_t DeclResultIdMapper::createSpirvStageVar(StageVar *stageVar,
   case hlsl::Semantic::Kind::ViewPortArrayIndex: {
     switch (sigPointKind) {
     case hlsl::SigPoint::Kind::VSIn:
-    case hlsl::SigPoint::Kind::VSOut:
     case hlsl::SigPoint::Kind::HSCPIn:
     case hlsl::SigPoint::Kind::HSCPOut:
     case hlsl::SigPoint::Kind::PCOut:
     case hlsl::SigPoint::Kind::DSIn:
     case hlsl::SigPoint::Kind::DSCPIn:
-    case hlsl::SigPoint::Kind::DSOut:
     case hlsl::SigPoint::Kind::GSVIn:
       return theBuilder.addStageIOVar(type, sc, name.str());
+    case hlsl::SigPoint::Kind::VSOut:
+    case hlsl::SigPoint::Kind::DSOut:
+      theBuilder.addExtension(Extension::EXT_shader_viewport_index_layer,
+                              "SV_ViewPortArrayIndex", srcLoc);
+      theBuilder.requireCapability(
+          spv::Capability::ShaderViewportIndexLayerEXT);
+
+      stageVar->setIsSpirvBuiltin();
+      return theBuilder.addStageBuiltinVar(type, sc, BuiltIn::ViewportIndex);
     case hlsl::SigPoint::Kind::GSOut:
     case hlsl::SigPoint::Kind::PSIn:
       theBuilder.requireCapability(spv::Capability::MultiViewport);

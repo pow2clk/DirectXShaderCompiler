@@ -62,7 +62,8 @@ private:
   /// this buffer.
   char *OutBufStart, *OutBufEnd, *OutBufCur;
 
-  /// base in which numbers will be written. default is 10. 8 and 16 are also possible
+  /// The base in which numbers will be written. default is 10. 8 and 16 are
+  /// also possible.
   int writeBase;  // HLSL Change
 
   enum BufferKind {
@@ -237,8 +238,9 @@ public:
   
   // Formatted output, see the formatHex() function in Support/Format.h.
   raw_ostream &operator<<(const FormattedNumber &);
-  
-  raw_ostream &operator<<(std::ios_base &(*iomanip)(std::ios_base&));  // HLSL Change
+
+  raw_ostream &
+  operator<<(std::ios_base &(*iomanip)(std::ios_base &)); // HLSL Change
 
   /// indent - Insert 'NumSpaces' spaces.
   raw_ostream &indent(unsigned NumSpaces);

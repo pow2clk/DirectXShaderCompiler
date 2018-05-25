@@ -120,6 +120,9 @@ TEST_F(FileTest, VarInitCbuffer) {
 TEST_F(FileTest, VarInitTbuffer) {
   runFileTest("var.init.tbuffer.hlsl", Expect::Warning);
 }
+TEST_F(FileTest, VarInitWarningIngored) {
+  runFileTest("var.init.warning.ignored.hlsl", Expect::Warning);
+}
 TEST_F(FileTest, VarInitOpaque) { runFileTest("var.init.opaque.hlsl"); }
 TEST_F(FileTest, VarInitCrossStorageClass) {
   runFileTest("var.init.cross-storage-class.hlsl");
@@ -432,12 +435,20 @@ TEST_F(FileTest, ControlFlowConditionalOp) { runFileTest("cf.cond-op.hlsl"); }
 // For functions
 TEST_F(FileTest, FunctionCall) { runFileTest("fn.call.hlsl"); }
 TEST_F(FileTest, FunctionDefaultArg) { runFileTest("fn.default-arg.hlsl"); }
-TEST_F(FileTest, FunctionInOutParam) { runFileTest("fn.param.inout.hlsl"); }
+TEST_F(FileTest, FunctionInOutParam) {
+  // Tests using uniform/in/out/inout annotations on function parameters
+  runFileTest("fn.param.inout.hlsl");
+}
 TEST_F(FileTest, FunctionInOutParamVector) {
   runFileTest("fn.param.inout.vector.hlsl");
 }
 TEST_F(FileTest, FunctionInOutParamDiffStorageClass) {
   runFileTest("fn.param.inout.storage-class.hlsl");
+}
+TEST_F(FileTest, FunctionInOutParamNoNeedToCopy) {
+  // Tests that referencing function scope variables as a whole with out/inout
+  // annotation does not create temporary variables
+  runFileTest("fn.param.inout.no-copy.hlsl");
 }
 TEST_F(FileTest, FunctionFowardDeclaration) {
   runFileTest("fn.foward-declaration.hlsl");
@@ -1414,6 +1425,18 @@ TEST_F(FileTest, VulkanLayout64BitTypesStd430) {
 }
 TEST_F(FileTest, VulkanLayout64BitTypesStd140) {
   runFileTest("vk.layout.64bit-types.std140.hlsl");
+}
+TEST_F(FileTest, VulkanLayout16BitTypesPushConstant) {
+  runFileTest("vk.layout.16bit-types.pc.hlsl");
+}
+TEST_F(FileTest, VulkanLayout16BitTypesCBuffer) {
+  runFileTest("vk.layout.16bit-types.cbuffer.hlsl");
+}
+TEST_F(FileTest, VulkanLayout16BitTypesTBuffer) {
+  runFileTest("vk.layout.16bit-types.tbuffer.hlsl");
+}
+TEST_F(FileTest, VulkanLayout16BitTypesStructuredBuffer) {
+  runFileTest("vk.layout.16bit-types.sbuffer.hlsl");
 }
 TEST_F(FileTest, VulkanLayoutVectorRelaxedLayout) {
   // Allows vectors to be aligned according to their element types, if not

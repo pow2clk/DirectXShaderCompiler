@@ -3657,15 +3657,15 @@ struct PointerStatus {
                              DxilTypeSystem &typeSys, bool bStructElt);
 
   PointerStatus(unsigned size)
-      : storedType(StoredType::NotStored), loadedType(NotLoaded), StoredOnceValue(nullptr),
+      : storedType(StoredType::NotStored), loadedType(LoadedType::NotLoaded), StoredOnceValue(nullptr),
         StoringMemcpy(nullptr), LoadingMemcpy(nullptr),
         AccessingFunction(nullptr), HasMultipleAccessingFunctions(false),
         Size(size) {}
   void MarkAsStored() {
-    storedType = StoredType::Stored;
+    storedType = PointerStatus::StoredType::Stored;
     StoredOnceValue = nullptr;
   }
-  void MarkAsLoaded() { loadedType = LoadedType::Loaded; }
+  void MarkAsLoaded() { loadedType = PointerStatus::LoadedType::Loaded; }
 };
 
 void PointerStatus::analyzePointer(const Value *V, PointerStatus &PS,
@@ -3696,8 +3696,8 @@ void PointerStatus::analyzePointer(const Value *V, PointerStatus &PS,
         }
         if (MC->getRawDest() == V) {
           if (bFullCopy &&
-              PS.storedType == StoredType::NotStored) {
-            PS.storedType = StoredType::MemcopyDestOnce;
+              PS.storedType == PointerStatus::StoredType::NotStored) {
+            PS.storedType = PointerStatus::StoredType::MemcopyDestOnce;
             PS.StoringMemcpy = MI;
           } else {
             PS.MarkAsStored();
@@ -3705,8 +3705,8 @@ void PointerStatus::analyzePointer(const Value *V, PointerStatus &PS,
           }
         } else if (MC->getRawSource() == V) {
           if (bFullCopy &&
-              PS.loadedType == LoadedType::NotLoaded) {
-            PS.loadedType = LoadedType::MemcopySrcOnce;
+              PS.loadedType == PointerStatus::LoadedType::NotLoaded) {
+            PS.loadedType = PointerStatus::LoadedType::MemcopySrcOnce;
             PS.LoadingMemcpy = MI;
           } else {
             PS.MarkAsLoaded();
@@ -3732,8 +3732,8 @@ void PointerStatus::analyzePointer(const Value *V, PointerStatus &PS,
     } else if (const StoreInst *SI = dyn_cast<StoreInst>(U)) {
       Value *V = SI->getOperand(0);
 
-      if (PS.storedType == StoredType::NotStored) {
-        PS.storedType = StoredType::StoredOnce;
+      if (PS.storedType == PointerStatus::StoredType::NotStored) {
+        PS.storedType = PointerStatus::StoredType::StoredOnce;
         PS.StoredOnceValue = V;
       } else {
         PS.MarkAsStored();

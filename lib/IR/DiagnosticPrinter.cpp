@@ -97,7 +97,8 @@ DiagnosticPrinter &DiagnosticPrinterRawOStream::operator<<(const Twine &Str) {
 }
 
 // HLSL Change Starts
-DiagnosticPrinter &DiagnosticPrinterRawOStream::operator<<(std::ios_base &(*iomanip)(std::ios_base&)) {
+DiagnosticPrinter &DiagnosticPrinterRawOStream::
+operator<<(std::ios_base &(*iomanip)(std::ios_base &)) {
   Stream << iomanip;
   return *this;
 }

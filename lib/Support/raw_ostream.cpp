@@ -26,6 +26,7 @@
 #include "llvm/Support/WinSAL.h"
 #include <cctype>
 #include <cerrno>
+#include <ios>
 #include <sys/stat.h>
 #include <system_error>
 
@@ -117,7 +118,6 @@ raw_ostream &raw_ostream::operator<<(unsigned long N) {
   }
   // HLSL Change Ends
 
-
   // Zero is a special case.
   if (N == 0)
     return *this << '0';
@@ -134,7 +134,7 @@ raw_ostream &raw_ostream::operator<<(unsigned long N) {
 }
 
 raw_ostream &raw_ostream::operator<<(long N) {
-  if (N <  0 && writeBase == 10) {
+  if (N < 0 && writeBase == 10) {
     *this << '-';
     // Avoid undefined behavior on LONG_MIN with a cast.
     N = -(unsigned long)N;
@@ -147,7 +147,6 @@ raw_ostream &raw_ostream::operator<<(unsigned long long N) {
   // Output using 32-bit div/mod when possible.
   if (N == static_cast<unsigned long>(N))
     return this->operator<<(static_cast<unsigned long>(N));
-
 
   // HLSL Change Starts - Handle non-base10 printing
   if (writeBase != 10) {
@@ -194,7 +193,7 @@ raw_ostream &raw_ostream::write_base(unsigned long long N) {
     return *this << '0';
 
   char NumberBuffer[20];
-  char *EndPtr = NumberBuffer+sizeof(NumberBuffer);
+  char *EndPtr = NumberBuffer + sizeof(NumberBuffer);
   char *CurPtr = EndPtr;
 
   while (N) {
@@ -203,7 +202,7 @@ raw_ostream &raw_ostream::write_base(unsigned long long N) {
     N /= writeBase;
   }
 
-  return write(CurPtr, EndPtr-CurPtr);
+  return write(CurPtr, EndPtr - CurPtr);
 }
 // HLSL Change Ends
 
@@ -488,10 +487,9 @@ raw_ostream &raw_ostream::operator<<(const FormattedNumber &FN) {
   }
 }
 
-
 // HLSL Change Starts - Add handling of numerical base IO manipulators.
-raw_ostream &raw_ostream::operator<<(std::ios_base &(*iomanip)(std::ios_base&))
-{
+raw_ostream &raw_ostream::
+operator<<(std::ios_base &(*iomanip)(std::ios_base &)) {
   if (iomanip == std::hex)
     writeBase = 16;
   else if (iomanip == std::oct)
@@ -500,10 +498,8 @@ raw_ostream &raw_ostream::operator<<(std::ios_base &(*iomanip)(std::ios_base&))
     writeBase = 10;
 
   return *this;
-
 }
 // HLSL Change Ends
-
 
 /// indent - Insert 'NumSpaces' spaces.
 raw_ostream &raw_ostream::indent(unsigned NumSpaces) {
