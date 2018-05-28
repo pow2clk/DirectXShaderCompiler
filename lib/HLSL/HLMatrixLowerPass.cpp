@@ -942,7 +942,7 @@ void HLMatrixLowerPass::TranslateMatVecMul(CallInst *matInst,
 
   unsigned col, row;
   Type *EltTy = GetMatrixInfo(matInst->getType(), col, row);
-  DXASSERT(RVal->getType()->getVectorNumElements() == col, "");
+  DXASSERT_NOMSG(RVal->getType()->getVectorNumElements() == col);
 
   bool isFloat = EltTy->isFloatingPointTy();
 
@@ -994,7 +994,7 @@ void HLMatrixLowerPass::TranslateVecMatMul(CallInst *matInst,
 
   unsigned col, row;
   Type *EltTy = GetMatrixInfo(matInst->getType(), col, row);
-  DXASSERT(LVal->getType()->getVectorNumElements() == row, "");
+  DXASSERT_NOMSG(LVal->getType()->getVectorNumElements() == row);
 
   bool isFloat = EltTy->isFloatingPointTy();
 

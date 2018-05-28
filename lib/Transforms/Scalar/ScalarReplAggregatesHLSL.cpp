@@ -4529,7 +4529,7 @@ static unsigned AllocateSemanticIndex(
       if (matrix.Orientation == MatrixOrientation::RowMajor) {
         rows = matrix.Rows;
       } else {
-        DXASSERT(matrix.Orientation == MatrixOrientation::ColumnMajor, "");
+        DXASSERT_NOMSG(matrix.Orientation == MatrixOrientation::ColumnMajor);
         rows = matrix.Cols;
       }
     }
