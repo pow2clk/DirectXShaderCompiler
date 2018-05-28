@@ -3737,7 +3737,7 @@ void SPIRVEmitter::handleOffsetInMethodCall(const CXXMemberCallExpr *expr,
     return; // Constant offset
   else
     *varOffset = doExpr(expr->getArg(index));
-};
+}
 
 SpirvEvalInfo
 SPIRVEmitter::processIntrinsicMemberCall(const CXXMemberCallExpr *expr,
