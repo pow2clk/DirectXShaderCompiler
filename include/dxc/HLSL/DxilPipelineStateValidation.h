@@ -23,34 +23,40 @@ inline uint32_t PSVComputeInputOutputTableSize(uint32_t InputVectors, uint32_t O
 #define PSVALIGN(ptr, alignbits) (((ptr) + ((1 << (alignbits))-1)) & ~((1 << (alignbits))-1))
 #define PSVALIGN4(ptr) (((ptr) + 3) & ~3)
 
+struct VSInfo {
+  char OutputPositionPresent;
+};
+struct HSInfo {
+  uint32_t InputControlPointCount;      // max control points == 32
+  uint32_t OutputControlPointCount;     // max control points == 32
+  uint32_t TessellatorDomain;           // hlsl::DXIL::TessellatorDomain/D3D11_SB_TESSELLATOR_DOMAIN
+  uint32_t TessellatorOutputPrimitive;  // hlsl::DXIL::TessellatorOutputPrimitive/D3D11_SB_TESSELLATOR_OUTPUT_PRIMITIVE
+};
+struct DSInfo {
+  uint32_t InputControlPointCount;      // max control points == 32
+  char OutputPositionPresent;
+  uint32_t TessellatorDomain;           // hlsl::DXIL::TessellatorDomain/D3D11_SB_TESSELLATOR_DOMAIN
+};
+struct GSInfo {
+  uint32_t InputPrimitive;              // hlsl::DXIL::InputPrimitive/D3D10_SB_PRIMITIVE
+  uint32_t OutputTopology;              // hlsl::DXIL::PrimitiveTopology/D3D10_SB_PRIMITIVE_TOPOLOGY
+  uint32_t OutputStreamMask;            // max streams == 4
+  char OutputPositionPresent;
+};
+struct PSInfo {
+  char DepthOutput;
+  char SampleFrequency;
+};
+
 // Versioning is additive and based on size
 struct PSVRuntimeInfo0
 {
   union {
-    struct VSInfo {
-      char OutputPositionPresent;
-    } VS;
-    struct HSInfo {
-      uint32_t InputControlPointCount;      // max control points == 32
-      uint32_t OutputControlPointCount;     // max control points == 32
-      uint32_t TessellatorDomain;           // hlsl::DXIL::TessellatorDomain/D3D11_SB_TESSELLATOR_DOMAIN
-      uint32_t TessellatorOutputPrimitive;  // hlsl::DXIL::TessellatorOutputPrimitive/D3D11_SB_TESSELLATOR_OUTPUT_PRIMITIVE
-    } HS;
-    struct DSInfo {
-      uint32_t InputControlPointCount;      // max control points == 32
-      char OutputPositionPresent;
-      uint32_t TessellatorDomain;           // hlsl::DXIL::TessellatorDomain/D3D11_SB_TESSELLATOR_DOMAIN
-    } DS;
-    struct GSInfo {
-      uint32_t InputPrimitive;              // hlsl::DXIL::InputPrimitive/D3D10_SB_PRIMITIVE
-      uint32_t OutputTopology;              // hlsl::DXIL::PrimitiveTopology/D3D10_SB_PRIMITIVE_TOPOLOGY
-      uint32_t OutputStreamMask;            // max streams == 4
-      char OutputPositionPresent;
-    } GS;
-    struct PSInfo {
-      char DepthOutput;
-      char SampleFrequency;
-    } PS;
+    VSInfo VS;
+    HSInfo HS;
+    DSInfo DS;
+    GSInfo GS;
+    PSInfo PS;
   };
   uint32_t MinimumExpectedWaveLaneCount;  // minimum lane count required, 0 if unused
   uint32_t MaximumExpectedWaveLaneCount;  // maximum lane count required, 0xffffffff if unused
@@ -384,7 +390,7 @@ public:
   // returns true if no errors occurred.
   bool InitFromPSV0(const void* pBits, uint32_t size) {
     if(!(pBits != nullptr)) return false;
-    const uint8_t* pCurBits = (uint8_t*)pBits;
+    uint8_t* pCurBits = (uint8_t*)pBits;
     uint32_t minsize = sizeof(PSVRuntimeInfo0) + sizeof(uint32_t) * 2;
     if(!(size >= minsize)) return false;
     m_uPSVRuntimeInfoSize = *((const uint32_t*)pCurBits);

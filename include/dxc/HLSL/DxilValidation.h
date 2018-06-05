@@ -14,6 +14,7 @@
 #include <memory>
 #include "dxc/Support/Global.h"
 #include "dxc/HLSL/DxilConstants.h"
+#include "llvm/Support/WinSAL.h"
 
 namespace llvm {
 class Module;

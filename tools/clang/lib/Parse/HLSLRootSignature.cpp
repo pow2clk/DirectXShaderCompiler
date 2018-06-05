@@ -18,6 +18,15 @@
 #include "dxc/Support/Global.h"
 #include "dxc/Support/WinIncludes.h"
 #include "HLSLRootSignature.h"
+
+#include <float.h>
+
+// SPIRV Change Starts
+#ifndef _WIN32
+#include "llvm/Support/WinFunctions.h"
+#endif
+// SPIRV Change Ends
+
 using namespace llvm;
 using namespace hlsl;
 
@@ -41,8 +50,7 @@ DEFINE_ENUM_FLAG_OPERATORS(DxilRootDescriptorFlags)
 DEFINE_ENUM_FLAG_OPERATORS(DxilDescriptorRangeFlags)
 
 RootSignatureTokenizer::RootSignatureTokenizer(const char *pStr, size_t len)
-  : m_pOrigStr(pStr)
-  , m_pStrPos(pStr)
+  : m_pStrPos(pStr)
   , m_pEndPos(pStr + len)
 {
     m_TokenBufferIdx = 0;
@@ -50,8 +58,7 @@ RootSignatureTokenizer::RootSignatureTokenizer(const char *pStr, size_t len)
 }
 
 RootSignatureTokenizer::RootSignatureTokenizer(const char *pStr)
-  : m_pOrigStr(pStr)
-  , m_pStrPos(pStr)
+  : m_pStrPos(pStr)
   , m_pEndPos(pStr + strlen(pStr))
 {
   m_TokenBufferIdx = 0;
@@ -83,6 +90,8 @@ void RootSignatureTokenizer::ReadNextToken(uint32_t BufferIdx)
     char *pBuffer = m_TokenStrings[BufferIdx];
     Token &T = m_Tokens[BufferIdx];
     bool bFloat = false;
+    bool bKW = false;
+    char c = 0;
 
     EatSpace();
 
@@ -185,7 +194,7 @@ void RootSignatureTokenizer::ReadNextToken(uint32_t BufferIdx)
     //
     // Classify token
     //
-    char c = pBuffer[0];
+    c = pBuffer[0];
 
     // Delimiters
     switch(c)
@@ -245,7 +254,6 @@ void RootSignatureTokenizer::ReadNextToken(uint32_t BufferIdx)
     // Keyword
 #define KW(__name)  ToKeyword(pBuffer, T, #__name, Token::Type::__name)
 
-    bool bKW = false;
     // Case-incensitive
     switch(toupper(c))
     {
@@ -506,9 +514,8 @@ HRESULT RootSignatureParser::Error(uint32_t uErrorNum, LPCSTR pError, ...)
 {
     va_list Args;
     char msg[512];
-    int len;
     va_start(Args, pError);
-    len = vsprintf_s(msg, pError, Args);
+    vsprintf_s(msg, pError, Args);
     va_end(Args);
     try {
       m_OS << msg;

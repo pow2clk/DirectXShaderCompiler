@@ -1,37 +1,57 @@
 version: 1.0.{build}
 
-image: Visual Studio 2017
+image:
+- Visual Studio 2017
+- Ubuntu
+
 platform: x64
 configuration: Release
 
-clone_folder: c:\projects\DirectXShaderCompiler
 clone_depth: 1
 
 environment:
-  HLSL_SRC_DIR: c:\projects\DirectXShaderCompiler
-  HLSL_BLD_DIR: c:\projects\DirectXShaderCompiler\build
   ARTIFACTS_ZIP_NAME: dxc-artifacts.zip
+  APPVEYOR_YML_DISABLE_PS_LINUX: true
 
 install:
-- cmd: git submodule update --init
+- sh: sudo apt-get install ninja-build
+- sh: sudo apt-get install clang -y
+- git submodule update --init
 
 before_build:
-- cmd: call utils\hct\hctstart %HLSL_SRC_DIR% %HLSL_BLD_DIR%
+- cmd: call utils\hct\hctstart %CD% %CD%\build
+- sh: cmake -H. -Bbuild -GNinja
+        $(cat utils/cmake-predefined-config-params)
+        -DSPIRV_BUILD_TESTS=ON
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
 
 build_script:
 - cmd: call utils\hct\hctbuild -%PLATFORM% -%CONFIGURATION% -vs2017 -spirvtest
+- sh: cd build && ninja dxc && ninja clang-spirv-tests
 
 test_script:
 - ps:  utils\appveyor\appveyor_test.ps1
 - cmd: call utils\hct\hcttest -rel spirv_only
+- sh: ./bin/dxc --help
+- sh: ./bin/dxc -T ps_6_0 ../tools/clang/test/CodeGenSPIRV/passthru-ps.hlsl2spv
+- sh: ./bin/clang-spirv-tests --spirv-test-root ../tools/clang/test/CodeGenSPIRV/
 
 after_test:
-- cmd: cd build\%CONFIGURATION%\bin
+- cmd: cd build\%CONFIGURATION%
 - cmd: echo %APPVEYOR_REPO_COMMIT% > GIT-COMMIT.txt
-- cmd: 7z a %ARTIFACTS_ZIP_NAME% d*.exe d*.dll HLSLHost.exe GIT-COMMIT.txt
+- cmd: xcopy "%HLSL_SRC_DIR%\include\dxc" include\dxc /s /i /y
+- cmd: 7z a %ARTIFACTS_ZIP_NAME% include lib\d*.lib bin\d*.exe bin\d*.dll bin\d*.pdb bin\HLSLHost.exe GIT-COMMIT.txt
 
-artifacts:
-- path: build\$(configuration)\bin\$(ARTIFACTS_ZIP_NAME)
+# For the time being, generate artifacts only for Windows.
+for:
+-
+  matrix:
+    only:
+      - image: Visual Studio 2017
+
+  artifacts:
+  - path: build\$(configuration)\$(ARTIFACTS_ZIP_NAME)
 
 notifications:
 - provider: GitHubPullRequest

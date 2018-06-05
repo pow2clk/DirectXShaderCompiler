@@ -598,22 +598,22 @@ are translated into SPIR-V ``OpTypeImage``, with parameters:
 ----------------------- -------------------------- ------------------------------------------------------------------------------------------
      Texture Type         Descriptor Type    RO/RW    Storage Class        Dim    Depth Arrayed MS Sampled   Image Format      Capability
 ======================= ==================== ===== =================== ========== ===== ======= == ======= ================ =================
-``Texture1D``           Sampled Image         RO   ``UniformConstant`` ``1D``      0       0    0    1     ``Unknown``
-``Texture2D``           Sampled Image         RO   ``UniformConstant`` ``2D``      0       0    0    1     ``Unknown``
-``Texture3D``           Sampled Image         RO   ``UniformConstant`` ``3D``      0       0    0    1     ``Unknown``
-``TextureCube``         Sampled Image         RO   ``UniformConstant`` ``Cube``    0       0    0    1     ``Unknown``
-``Texture1DArray``      Sampled Image         RO   ``UniformConstant`` ``1D``      0       1    0    1     ``Unknown``
-``Texture2DArray``      Sampled Image         RO   ``UniformConstant`` ``2D``      0       1    0    1     ``Unknown``
-``Texture2DMS``         Sampled Image         RO   ``UniformConstant`` ``2D``      0       0    1    1     ``Unknown``
-``Texture2DMSArray``    Sampled Image         RO   ``UniformConstant`` ``2D``      0       1    1    1     ``Unknown``      ``ImageMSArray``
-``TextureCubeArray``    Sampled Image         RO   ``UniformConstant`` ``3D``      0       1    0    1     ``Unknown``
-``Buffer<T>``           Uniform Texel Buffer  RO   ``UniformConstant`` ``Buffer``  0       0    0    1     Depends on ``T`` ``SampledBuffer``
-``RWBuffer<T>``         Storage Texel Buffer  RW   ``UniformConstant`` ``Buffer``  0       0    0    2     Depends on ``T`` ``SampledBuffer``
-``RWTexture1D<T>``      Storage Image         RW   ``UniformConstant`` ``1D``      0       0    0    2     Depends on ``T``
-``RWTexture2D<T>``      Storage Image         RW   ``UniformConstant`` ``2D``      0       0    0    2     Depends on ``T``
-``RWTexture3D<T>``      Storage Image         RW   ``UniformConstant`` ``3D``      0       0    0    2     Depends on ``T``
-``RWTexture1DArray<T>`` Storage Image         RW   ``UniformConstant`` ``1D``      0       1    0    2     Depends on ``T``
-``RWTexture2DArray<T>`` Storage Image         RW   ``UniformConstant`` ``2D``      0       1    0    2     Depends on ``T``
+``Texture1D``           Sampled Image         RO   ``UniformConstant`` ``1D``      2       0    0    1     ``Unknown``
+``Texture2D``           Sampled Image         RO   ``UniformConstant`` ``2D``      2       0    0    1     ``Unknown``
+``Texture3D``           Sampled Image         RO   ``UniformConstant`` ``3D``      2       0    0    1     ``Unknown``
+``TextureCube``         Sampled Image         RO   ``UniformConstant`` ``Cube``    2       0    0    1     ``Unknown``
+``Texture1DArray``      Sampled Image         RO   ``UniformConstant`` ``1D``      2       1    0    1     ``Unknown``
+``Texture2DArray``      Sampled Image         RO   ``UniformConstant`` ``2D``      2       1    0    1     ``Unknown``
+``Texture2DMS``         Sampled Image         RO   ``UniformConstant`` ``2D``      2       0    1    1     ``Unknown``
+``Texture2DMSArray``    Sampled Image         RO   ``UniformConstant`` ``2D``      2       1    1    1     ``Unknown``      ``ImageMSArray``
+``TextureCubeArray``    Sampled Image         RO   ``UniformConstant`` ``3D``      2       1    0    1     ``Unknown``
+``Buffer<T>``           Uniform Texel Buffer  RO   ``UniformConstant`` ``Buffer``  2       0    0    1     Depends on ``T`` ``SampledBuffer``
+``RWBuffer<T>``         Storage Texel Buffer  RW   ``UniformConstant`` ``Buffer``  2       0    0    2     Depends on ``T`` ``SampledBuffer``
+``RWTexture1D<T>``      Storage Image         RW   ``UniformConstant`` ``1D``      2       0    0    2     Depends on ``T``
+``RWTexture2D<T>``      Storage Image         RW   ``UniformConstant`` ``2D``      2       0    0    2     Depends on ``T``
+``RWTexture3D<T>``      Storage Image         RW   ``UniformConstant`` ``3D``      2       0    0    2     Depends on ``T``
+``RWTexture1DArray<T>`` Storage Image         RW   ``UniformConstant`` ``1D``      2       1    0    2     Depends on ``T``
+``RWTexture2DArray<T>`` Storage Image         RW   ``UniformConstant`` ``2D``      2       1    0    2     Depends on ``T``
 ======================= ==================== ===== =================== ========== ===== ======= == ======= ================ =================
 
 The meanings of the headers in the above table is explained in ``OpTypeImage``
@@ -1279,13 +1279,6 @@ If there is no register specification, the corresponding resource will be
 assigned to the next available binding number, starting from 0, in descriptor
 set #0.
 
-Error checking
-~~~~~~~~~~~~~~
-
-Trying to reuse the same binding number of the same descriptor set results in
-a compiler error, unless we have exactly two resources and one is an image and
-the other is a sampler. This is to support the Vulkan combined image sampler.
-
 Summary
 ~~~~~~~
 
@@ -1866,6 +1859,35 @@ HLSL Intrinsic Function   GLSL Extended Instruction
 ``tanh``                ``Tanh``
 ``trunc``               ``Trunc``
 ======================= ===================================
+
+Synchronization intrinsics
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Synchronization intrinsics are translated into ``OpMemoryBarrier`` (for those
+non-``WithGroupSync`` variants) or ``OpControlBarrier`` (for those ``WithGroupSync``
+variants) instructions with parameters:
+
+======================= ============ ===== ======= ========= ==============
+       HLSL                SPIR-V          SPIR-V Memory Semantics
+----------------------- ------------ --------------------------------------
+     Intrinsic          Memory Scope Image Uniform Workgroup AcquireRelease
+======================= ============ ===== ======= ========= ==============
+``AllMemoryBarrier``    Device       ✓       ✓         ✓          ✓
+``DeviceMemoryBarrier`` Device       ✓       ✓                    ✓
+``GroupMemoryBarrier``  Workgroup                       ✓          ✓
+======================= ============ ===== ======= ========= ==============
+
+For the ``*WithGroupSync`` intrinsics, SPIR-V memory scope and semantics are the
+same as their counterparts in the above. They have an additional execution
+scope:
+
+==================================== ======================
+       HLSL Intrinsic                SPIR-V Execution Scope
+==================================== ======================
+``AllMemoryBarrierWithGroupSync``    Workgroup
+``DeviceMemoryBarrierWithGroupSync`` Workgroup
+``GroupMemoryBarrierWithGroupSync``  Workgroup
+==================================== ======================
 
 HLSL OO features
 ================
@@ -2689,6 +2711,8 @@ codegen for Vulkan:
 - ``-fspv-target-env=<env>``: Specifies the target environment for this compilation.
   The current valid options are ``vulkan1.0`` and ``vulkan1.1``. If no target
   environment is provided, ``vulkan1.0`` is used as default.
+- ``-Wno-vk-ignored-features``: Does not emit warnings on ignored features
+  resulting from no Vulkan support, e.g., cbuffer member initializer.
 
 Unsupported HLSL Features
 =========================

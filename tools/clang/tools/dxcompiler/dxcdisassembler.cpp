@@ -29,16 +29,17 @@
 #include "dxc/HLSL/DxilUtil.h"
 #include "dxcutil.h"
 
+// SPIRV Change Starts
+#ifndef _WIN32
+#include "llvm/Support/WinFunctions.h"
+#endif
+// SPIRV Change Ends
+
 using namespace llvm;
 using namespace hlsl;
 
 namespace {
 // Disassemble helper functions.
-
-void PrintDiagnosticHandler(const DiagnosticInfo &DI, void *Context) {
-  DiagnosticPrinter *printer = reinterpret_cast<DiagnosticPrinter *>(Context);
-  DI.print(*printer);
-}
 
 template <typename T>
 const T *ByteOffset(LPCVOID p, uint32_t byteOffset) {
@@ -97,7 +98,7 @@ void PrintSignature(LPCSTR pName, const DxilProgramSignature *pSignature,
     if (pSig->Mask & DxilProgramSigMaskW)
       Mask[3] = 'w';
 
-    if (pSig->Register == -1) {
+    if (pSig->Register == (unsigned)-1) {
       OS << "    N/A";
       if (!_stricmp(pSemanticName, "SV_Depth"))
         OS << "   oDepth";
@@ -242,7 +243,7 @@ void PrintSignature(LPCSTR pName, const DxilProgramSignature *pSignature,
     if (rwMask & DxilProgramSigMaskW)
       Mask[3] = 'w';
 
-    if (pSig->Register == -1)
+    if (pSig->Register == (unsigned)-1)
       OS << (rwMask ? "    YES" : "     NO");
     else
       OS << "   " << Mask[0] << Mask[1] << Mask[2] << Mask[3];
@@ -285,7 +286,12 @@ void PrintDxilSignature(LPCSTR pName, const DxilSignature &Signature,
     OS << comment << " ";
 
     OS << left_justify(sigElt->GetName(), 20);
-    OS << ' ' << format("%5u", sigElt->GetSemanticIndexVec()[0]);
+    auto &indexVec = sigElt->GetSemanticIndexVec();
+    unsigned index = 0;
+    if (!indexVec.empty()) {
+      index = sigElt->GetSemanticIndexVec()[0];
+    }
+    OS << ' ' << format("%5u", index);
     sigElt->GetInterpolationMode()->GetName();
     OS << ' ' << right_justify(sigElt->GetInterpolationMode()->GetName(), 22);
     OS << "   ";
@@ -1012,7 +1018,7 @@ void PrintPipelineStateValidationRuntimeInfo(const char *pBuffer,
      << comment << "\n";
 
   const unsigned offset = sizeof(unsigned);
-  const PSVRuntimeInfo0 *pInfo = (PSVRuntimeInfo0 *)(pBuffer + offset);
+  const PSVRuntimeInfo0 *pInfo = (const PSVRuntimeInfo0 *)(pBuffer + offset);
 
   switch (shaderKind) {
   case DXIL::ShaderKind::Hull: {

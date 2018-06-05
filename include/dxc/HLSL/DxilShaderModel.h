@@ -11,9 +11,9 @@
 
 #pragma once
 
-#include "dxc/HLSL/DxilConstants.h"
 #include <string>
-
+#include "dxc/HLSL/DxilConstants.h"
+#include "llvm/Support/WinSAL.h"
 
 namespace hlsl {
 

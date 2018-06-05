@@ -38,6 +38,8 @@
 #include "dxc/HLSL/HLOperations.h"
 #include "dxc/HLSL/DxilShaderModel.h"
 #include <array>
+#include <float.h>
+#include "llvm/Support/WinSAL.h"
 
 enum ArBasicKind {
   AR_BASIC_BOOL,
@@ -639,15 +641,9 @@ using namespace hlsl;
 
 extern const char *HLSLScalarTypeNames[];
 
-static const int FirstTemplateDepth = 0;
-static const int FirstParamPosition = 0;
 static const bool ExplicitConversionFalse = false;// a conversion operation is not the result of an explicit cast
-static const bool InheritedFalse = false;         // template parameter default value is not inherited.
 static const bool ParameterPackFalse = false;     // template parameter is not an ellipsis.
 static const bool TypenameTrue = false;           // 'typename' specified rather than 'class' for a template argument.
-static const bool DelayTypeCreationTrue = true;   // delay type creation for a declaration
-static const bool DelayTypeCreationFalse = false; // immediately create a type when the declaration is created
-static const unsigned int NoQuals = 0;            // no qualifiers in effect
 static const SourceLocation NoLoc;                // no source location attribution available
 static const SourceRange NoRange;                 // no source range attribution available
 static const bool HasWrittenPrototypeTrue = true; // function had the prototype written
@@ -655,8 +651,6 @@ static const bool InlineSpecifiedFalse = false;   // function was not specified 
 static const bool IsConstexprFalse = false;       // function is not constexpr
 static const bool ListInitializationFalse = false;// not performing a list initialization
 static const bool SuppressWarningsFalse = false;  // do not suppress warning diagnostics
-static const bool SuppressWarningsTrue = true;    // suppress warning diagnostics
-static const bool SuppressErrorsFalse = false;    // do not suppress error diagnostics
 static const bool SuppressErrorsTrue = true;      // suppress error diagnostics
 static const int OneRow = 1;                      // a single row for a type
 static const bool MipsFalse = false;              // a type does not support the .mips member
@@ -1507,24 +1501,6 @@ const char* g_DeprecatedEffectObjectNames[] =
   "RenderTargetView", // 16
 };
 
-// The CompareStringsWithLen function lexicographically compares LHS and RHS and
-// returns a value indicating the relationship between the strings - < 0 if LHS is
-// less than RHS, 0 if they are equal, > 0 if LHS is greater than RHS.
-static
-int CompareStringsWithLen(
-  _In_count_(LHSlen) const char* LHS, size_t LHSlen,
-  _In_count_(RHSlen) const char* RHS, size_t RHSlen
-)
-{
-  // Check whether the name is greater or smaller (without walking past end).
-  size_t maxNameComparable = std::min(LHSlen, RHSlen);
-  int comparison = strncmp(LHS, RHS, maxNameComparable);
-  if (comparison != 0) return comparison;
-
-  // Check whether the name is greater or smaller based on extra characters.
-  return LHSlen - RHSlen;
-}
-
 static hlsl::ParameterModifier
 ParamModsFromIntrinsicArg(const HLSL_INTRINSIC_ARGUMENT *pArg) {
   if (pArg->qwUsage == AR_QUAL_IN_OUT) {
@@ -1581,7 +1557,6 @@ static void AddHLSLIntrinsicAttr(FunctionDecl *FD, ASTContext &context,
   unsigned opcode = (unsigned)pIntrinsic->Op;
   if (HasUnsignedOpcode(opcode) && IsBuiltinTable(tableName)) {
     QualType Ty = FD->getReturnType();
-    IntrinsicOp intrinOp = static_cast<IntrinsicOp>(pIntrinsic->Op);
     if (pIntrinsic->iOverloadParamIndex != -1) {
       const FunctionProtoType *FT =
           FD->getFunctionType()->getAs<FunctionProtoType>();
@@ -1637,7 +1612,6 @@ FunctionDecl *AddHLSLIntrinsicFunction(
   IdentifierInfo &functionId = context.Idents.get(
       StringRef(pIntrinsic->pArgs[0].pName), tok::TokenKind::identifier);
   DeclarationName functionName(&functionId);
-  QualType returnQualType = functionArgQualTypes[0];
   QualType functionType = context.getFunctionType(
       functionArgQualTypes[0],
       ArrayRef<QualType>(functionArgQualTypes + 1,
@@ -2119,32 +2093,6 @@ bool DoesLegalTemplateAcceptMultipleTypes(BYTE value)
   return DoesLegalTemplateAcceptMultipleTypes(static_cast<LEGAL_INTRINSIC_TEMPLATES>(value));
 }
 
-
-static
-bool DoesIntrinsicRequireTemplate(const HLSL_INTRINSIC* intrinsic)
-{
-  const HLSL_INTRINSIC_ARGUMENT* argument = intrinsic->pArgs;
-  for (size_t i = 0; i < intrinsic->uNumArgs; i++)
-  {
-    // The intrinsic will require a template for any of these reasons:
-    // - A type template (layout) or component needs to match something else.
-    // - A parameter can take multiple types.
-    // - Row or columns numbers may vary.
-    if (
-      argument->uTemplateId != i ||
-      DoesLegalTemplateAcceptMultipleTypes(argument->uLegalTemplates) ||
-      DoesComponentTypeAcceptMultipleTypes(argument->uLegalComponentTypes) ||
-      IsRowOrColumnVariable(argument->uCols) ||
-      IsRowOrColumnVariable(argument->uRows))
-    {
-      return true;
-    }
-    argument++;
-  }
-
-  return false;
-}
-
 static
 bool TemplateHasDefaultType(ArBasicKind kind)
 {
@@ -2476,9 +2424,9 @@ namespace hlsl {
     void dump() const {
       OutputDebugStringW(L"Call Nodes:\r\n");
       for (auto &node : m_callNodes) {
-        OutputDebugFormatA("%s [%p]:\r\n", node.first->getName().str().c_str(), node.first);
+        OutputDebugFormatA("%s [%p]:\r\n", node.first->getName().str().c_str(), (void*)node.first);
         for (auto callee : node.second.CalleeFns) {
-          OutputDebugFormatA("    %s [%p]\r\n", callee->getName().str().c_str(), callee);
+          OutputDebugFormatA("    %s [%p]\r\n", callee->getName().str().c_str(), (void*)callee);
         }
       }
     }
@@ -2948,7 +2896,7 @@ private:
     TypeSourceInfo *float4TypeSourceInfo = m_context->getTrivialTypeSourceInfo(float4Type, NoLoc);
     m_objectTypeLazyInitMask = 0;
     unsigned effectKindIndex = 0;
-    for (int i = 0; i < _countof(g_ArBasicKindsAsTypes); i++)
+    for (unsigned i = 0; i < _countof(g_ArBasicKindsAsTypes); i++)
     {
       ArBasicKind kind = g_ArBasicKindsAsTypes[i];
       if (kind == AR_OBJECT_WAVE) { // wave objects are currently unused
@@ -2996,7 +2944,7 @@ private:
       // Create decls for each deprecated effect object type:
       unsigned effectObjBase = _countof(g_ArBasicKindsAsTypes);
       // TypeSourceInfo* effectObjTypeSource = m_context->getTrivialTypeSourceInfo(GetBasicKindType(AR_OBJECT_LEGACY_EFFECT));
-      for (int i = 0; i < _countof(g_DeprecatedEffectObjectNames); i++) {
+      for (unsigned i = 0; i < _countof(g_DeprecatedEffectObjectNames); i++) {
         IdentifierInfo& idInfo = m_context->Idents.get(StringRef(g_DeprecatedEffectObjectNames[i]), tok::TokenKind::identifier);
         //TypedefDecl* effectObjDecl = TypedefDecl::Create(*m_context, currentDeclContext, NoLoc, NoLoc, &idInfo, effectObjTypeSource);
         CXXRecordDecl *effectObjDecl = CXXRecordDecl::Create(*m_context, TagTypeKind::TTK_Struct, currentDeclContext, NoLoc, NoLoc, &idInfo);
@@ -3026,8 +2974,7 @@ private:
 
   clang::TypedefDecl *LookupMatrixShorthandType(HLSLScalarType scalarType, UINT rowCount, UINT colCount) {
     DXASSERT_NOMSG(scalarType != HLSLScalarType::HLSLScalarType_unknown &&
-                   rowCount >= 0 && rowCount <= 4 && colCount >= 0 &&
-                   colCount <= 4);
+                   rowCount <= 4 && colCount <= 4);
     TypedefDecl *qts =
         m_matrixShorthandTypes[scalarType][rowCount - 1][colCount - 1];
     if (qts == nullptr) {
@@ -3041,7 +2988,7 @@ private:
 
   clang::TypedefDecl *LookupVectorShorthandType(HLSLScalarType scalarType, UINT colCount) {
     DXASSERT_NOMSG(scalarType != HLSLScalarType::HLSLScalarType_unknown &&
-                   colCount >= 0 && colCount <= 4);
+                   colCount <= 4);
     TypedefDecl *qts = m_vectorTypedefs[scalarType][colCount - 1];
     if (qts == nullptr) {
       QualType type = LookupVectorType(scalarType, colCount);
@@ -3234,12 +3181,10 @@ public:
         R.addDecl(typeDecl);
       }
       else if (rowCount == 0) { // vector
-        QualType qt = LookupVectorType(parsedType, colCount);
         TypedefDecl *qts = LookupVectorShorthandType(parsedType, colCount);
         R.addDecl(qts);
       }
       else { // matrix
-        QualType qt = LookupMatrixType(parsedType, rowCount, colCount);
         TypedefDecl* qts = LookupMatrixShorthandType(parsedType, rowCount, colCount);
         R.addDecl(qts);
       }
@@ -3458,13 +3403,12 @@ public:
     DXASSERT_NOMSG(table != nullptr);
 
     // Function intrinsics are added on-demand, objects get template methods.
-    for (int i = 0; i < _countof(g_ArBasicKindsAsTypes); i++) {
+    for (unsigned i = 0; i < _countof(g_ArBasicKindsAsTypes); i++) {
       // Grab information already processed by AddObjectTypes.
       ArBasicKind kind = g_ArBasicKindsAsTypes[i];
       const char *typeName = g_ArBasicTypeNames[kind];
       uint8_t templateArgCount = g_ArBasicKindsTemplateCount[i];
-      DXASSERT(0 <= templateArgCount && templateArgCount <= 2,
-        "otherwise a new case has been added");
+      DXASSERT(templateArgCount <= 2, "otherwise a new case has been added");
       int startDepth = (templateArgCount == 0) ? 0 : 1;
       CXXRecordDecl *recordDecl = m_objectTypeDecls[i];
       if (recordDecl == nullptr) {
@@ -3633,7 +3577,7 @@ public:
   QualType NewQualifiedType(UINT64 qwUsages, QualType type)
   {
     // NOTE: NewQualifiedType does quite a bit more in the prior compiler
-    (qwUsages);
+    (void)(qwUsages);
     return type;
   }
 
@@ -4006,7 +3950,7 @@ public:
   /// <param name="RHS">Right hand side.</param>
   /// <param name="QuestionLoc">Location of question mark in operator.</param>
   /// <returns>Result type of vector conditional expression.</returns>
-  clang::QualType HLSLExternalSource::CheckVectorConditional(
+  clang::QualType CheckVectorConditional(
     _In_ ExprResult &Cond,
     _In_ ExprResult &LHS,
     _In_ ExprResult &RHS,
@@ -4557,19 +4501,6 @@ QualType GetFirstElementTypeFromDecl(const Decl* decl)
   return QualType();
 }
 
-static
-QualType GetFirstElementType(QualType type)
-{
-  if (!type.isNull()) {
-    const RecordType* record = type->getAs<RecordType>();
-    if (record) {
-      return GetFirstElementTypeFromDecl(record->getDecl());
-    }
-  }
-
-  return QualType();
-}
-
 void HLSLExternalSource::AddBaseTypes()
 {
   DXASSERT(m_baseTypes[HLSLScalarType_unknown].isNull(), "otherwise unknown was initialized to an actual type");
@@ -4975,8 +4906,8 @@ bool HLSLExternalSource::MatchArguments(
 
     // Compare template
     if ((AR_TOBJ_UNKNOWN == Template[pIntrinsicArg->uTemplateId]) ||
-         (AR_TOBJ_SCALAR == Template[pIntrinsicArg->uTemplateId]) &&
-        (AR_TOBJ_VECTOR == TypeInfoShapeKind || AR_TOBJ_MATRIX == TypeInfoShapeKind)) {
+        ((AR_TOBJ_SCALAR == Template[pIntrinsicArg->uTemplateId]) &&
+         (AR_TOBJ_VECTOR == TypeInfoShapeKind || AR_TOBJ_MATRIX == TypeInfoShapeKind))) {
       Template[pIntrinsicArg->uTemplateId] = TypeInfoShapeKind;
     }
     else if (AR_TOBJ_SCALAR == TypeInfoShapeKind) {
@@ -5165,7 +5096,7 @@ bool HLSLExternalSource::MatchArguments(
       // Use the templated input type, but resize it if the
       // intrinsic's rows/cols isn't 0
       if (pArgument->uRows && pArgument->uCols) {
-        UINT uRows, uCols;
+        UINT uRows, uCols = 0;
 
         // if type is overriden, use new type size, for
         // now it only supports scalars
@@ -6163,7 +6094,7 @@ UINT64 HLSLExternalSource::ScoreCast(QualType pLType, QualType pRType)
   }
 
 #define SCORE_COND(shift, cond) { \
-  if (cond) uScore += 1UI64 << (SCORE_MIN_SHIFT + SCORE_PARAM_SHIFT * shift); }
+  if (cond) uScore += 1ULL << (SCORE_MIN_SHIFT + SCORE_PARAM_SHIFT * shift); }
   SCORE_COND(0, uRSize < uLSize);
   SCORE_COND(1, bLPromo);
   SCORE_COND(2, bRPromo);
@@ -7262,6 +7193,9 @@ bool HLSLExternalSource::CanConvert(
   _Out_opt_ TYPE_CONVERSION_REMARKS* remarks,
   _Inout_opt_ StandardConversionSequence* standard)
 {
+  bool bCheckElt = false;
+  UINT uTSize, uSSize;
+
   DXASSERT_NOMSG(sourceExpr != nullptr);
   DXASSERT_NOMSG(!target.isNull());
 
@@ -7320,8 +7254,8 @@ bool HLSLExternalSource::CanConvert(
   CollectInfo(target, &TargetInfo);
   CollectInfo(source, &SourceInfo);
 
-  UINT uTSize = TargetInfo.uTotalElts;
-  UINT uSSize = SourceInfo.uTotalElts;
+  uTSize = TargetInfo.uTotalElts;
+  uSSize = SourceInfo.uTotalElts;
 
   // TODO: TYPE_CONVERSION_BY_REFERENCE does not seem possible here
   // are we missing cases?
@@ -7440,7 +7374,6 @@ bool HLSLExternalSource::CanConvert(
   // 5. The result of a matrix and a vector is similar to #4.
   //
 
-  bool bCheckElt = false;
 
   switch (TargetInfo.ShapeKind) {
   case AR_TOBJ_BASIC:
@@ -8627,7 +8560,6 @@ bool HLSLExternalSource::TryStaticCastForHLSL(ExprResult &SrcExpr,
   DXASSERT(!SrcExpr.isInvalid(), "caller should check for invalid expressions and placeholder types");
   bool explicitConversion
     = (CCK == Sema::CCK_CStyleCast || CCK == Sema::CCK_FunctionalCast);
-  QualType sourceType = SrcExpr.get()->getType();
   bool suppressWarnings = explicitConversion || SuppressWarnings;
   SourceLocation loc = OpRange.getBegin();
   if (ValidateCast(loc, SrcExpr.get(), DestType, explicitConversion, suppressWarnings, SuppressErrors, standard)) {
@@ -9127,7 +9059,7 @@ void hlsl::DiagnoseRegisterType(
   case AR_OBJECT_LEGACY_EFFECT:   // Used for all unsupported but ignored legacy effect types
     isWarning = true;
     break;                        // So we don't care what you tried to bind it to
-  };
+  }
 
   // fxc is inconsistent as to when it reports an error and when it ignores invalid bind semantics, so emit
   // a warning instead.
@@ -9175,7 +9107,6 @@ void hlsl::DiagnoseTranslationUnit(clang::Sema *self) {
 
   // TODO: make these error 'real' errors rather than on-the-fly things
   // Validate that the entry point is available.
-  ASTContext &Ctx = self->getASTContext();
   DiagnosticsEngine &Diags = self->getDiagnostics();
   FunctionDecl *pEntryPointDecl = nullptr;
   FunctionDecl *pPatchFnDecl = nullptr;
@@ -10604,7 +10535,6 @@ Decl* Sema::ActOnStartHLSLBuffer(
   SourceLocation LBrace)
 {
   // For anonymous namespace, take the location of the left brace.
-  SourceLocation Loc = Ident ? IdentLoc : LBrace;
   DeclContext* lexicalParent = getCurLexicalContext();
   clang::HLSLBufferDecl *result = HLSLBufferDecl::Create(
       Context, lexicalParent, cbuffer, /*isConstantBufferView*/ false, KwLoc,
@@ -10962,9 +10892,6 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC,
 
   // Validate attributes
   clang::AttributeList
-    *pPrecise = nullptr,
-    *pShared = nullptr,
-    *pGroupShared = nullptr,
     *pUniform = nullptr,
     *pUsage = nullptr,
     *pNoInterpolation = nullptr,
@@ -10984,7 +10911,6 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC,
 
     switch (pAttr->getKind()) {
     case AttributeList::AT_HLSLPrecise: // precise is applicable everywhere.
-      pPrecise = pAttr;
       break;
     case AttributeList::AT_HLSLShared:
       if (!isGlobal) {
@@ -10998,7 +10924,6 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC,
             << pAttr->getRange();
         result = false;
       }
-      pShared = pAttr;
       break;
     case AttributeList::AT_HLSLGroupShared:
       if (!isGlobal) {
@@ -11012,7 +10937,6 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC,
             << pAttr->getRange();
         result = false;
       }
-      pGroupShared = pAttr;
       break;
     case AttributeList::AT_HLSLGloballyCoherent:
       if (!bIsObject) {

@@ -62,7 +62,7 @@ inline bool hasGSPrimitiveTypeQualifier(const DeclaratorDecl *decl) {
 GlPerVertex::GlPerVertex(const hlsl::ShaderModel &sm, ASTContext &context,
                          ModuleBuilder &builder, TypeTranslator &translator)
     : shaderModel(sm), astContext(context), theBuilder(builder),
-      typeTranslator(translator), inClipVar(0), inCullVar(0), outClipVar(0),
+      inClipVar(0), inCullVar(0), outClipVar(0),
       outCullVar(0), inArraySize(0), outArraySize(0), inClipArraySize(1),
       outClipArraySize(1), inCullArraySize(1), outCullArraySize(1),
       inSemanticStrs(2, ""), outSemanticStrs(2, "") {}
@@ -208,7 +208,7 @@ bool GlPerVertex::doGlPerVertexFacts(const DeclaratorDecl *decl,
       (*semanticStrs)[index] = "SV_CullDistance";
   }
 
-  if (index < gClipDistanceIndex || index > gCullDistanceIndex) {
+  if (index > gCullDistanceIndex) {
     // Annotated with something other than SV_ClipDistance or SV_CullDistance.
     // We don't care about such cases.
     return true;
@@ -461,7 +461,7 @@ uint32_t GlPerVertex::readClipCullArrayAsType(bool isClip, uint32_t offset,
   }
 
   return theBuilder.createCompositeConstruct(arrayType, arrayElements);
-};
+}
 
 bool GlPerVertex::readField(hlsl::Semantic::Kind semanticKind,
                             uint32_t semanticIndex, uint32_t *value) {
@@ -579,7 +579,7 @@ void GlPerVertex::writeClipCullArrayFromType(
 
   llvm_unreachable("SV_ClipDistance/SV_CullDistance not float or vector of "
                    "float case sneaked in");
-};
+}
 
 bool GlPerVertex::writeField(hlsl::Semantic::Kind semanticKind,
                              uint32_t semanticIndex,

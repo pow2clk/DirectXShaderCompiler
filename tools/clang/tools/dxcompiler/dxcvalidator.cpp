@@ -24,7 +24,10 @@
 #include "dxc/Support/FileIOHelper.h"
 #include "dxc/Support/dxcapi.impl.h"
 #include "dxc/HLSL/DxilRootSignature.h"
+
+#ifdef LLVM_ON_WIN32
 #include "dxcetw.h"
+#endif
 
 using namespace llvm;
 using namespace hlsl;
@@ -65,7 +68,7 @@ public:
   DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL()
   DXC_MICROCOM_TM_CTOR(DxcValidator)
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcValidator, IDxcVersionInfo>(this, iid, ppvObject);
   }
 

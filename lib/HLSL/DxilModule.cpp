@@ -57,21 +57,7 @@ namespace hlsl {
 //  DxilModule methods.
 //
 DxilModule::DxilModule(Module *pModule)
-: m_Ctx(pModule->getContext())
-, m_pModule(pModule)
-, m_pOP(std::make_unique<OP>(pModule->getContext(), pModule))
-, m_pTypeSystem(std::make_unique<DxilTypeSystem>(pModule))
-, m_pViewIdState(std::make_unique<DxilViewIdState>(this))
-, m_pMDHelper(std::make_unique<DxilMDHelper>(pModule, std::make_unique<DxilExtraPropertyHelper>(pModule)))
-, m_pDebugInfoFinder(nullptr)
-, m_pEntryFunc(nullptr)
-, m_EntryName("")
-, m_pPatchConstantFunc(nullptr)
-, m_pSM(nullptr)
-, m_DxilMajor(DXIL::kDxilMajor)
-, m_DxilMinor(DXIL::kDxilMinor)
-, m_ValMajor(1)
-, m_ValMinor(0)
+: m_RootSignature(nullptr)
 , m_InputPrimitive(DXIL::InputPrimitive::Undefined)
 , m_MaxVertexCount(0)
 , m_StreamPrimitiveTopology(DXIL::PrimitiveTopology::Undefined)
@@ -83,7 +69,22 @@ DxilModule::DxilModule(Module *pModule)
 , m_TessellatorPartitioning(DXIL::TessellatorPartitioning::Undefined)
 , m_TessellatorOutputPrimitive(DXIL::TessellatorOutputPrimitive::Undefined)
 , m_MaxTessellationFactor(0.f)
-, m_RootSignature(nullptr) {
+, m_Ctx(pModule->getContext())
+, m_pModule(pModule)
+, m_pEntryFunc(nullptr)
+, m_pPatchConstantFunc(nullptr)
+, m_EntryName("")
+, m_pMDHelper(llvm::make_unique<DxilMDHelper>(pModule, llvm::make_unique<DxilExtraPropertyHelper>(pModule)))
+, m_pDebugInfoFinder(nullptr)
+, m_pSM(nullptr)
+, m_DxilMajor(DXIL::kDxilMajor)
+, m_DxilMinor(DXIL::kDxilMinor)
+, m_ValMajor(1)
+, m_ValMinor(0)
+, m_pOP(llvm::make_unique<OP>(pModule->getContext(), pModule))
+, m_pTypeSystem(llvm::make_unique<DxilTypeSystem>(pModule))
+, m_pViewIdState(llvm::make_unique<DxilViewIdState>(this)) {
+
   DXASSERT_NOMSG(m_pModule != nullptr);
 
   m_NumThreads[0] = m_NumThreads[1] = m_NumThreads[2] = 0;
@@ -117,9 +118,9 @@ DxilModule::ShaderFlags::ShaderFlags():
 , m_bTiledResources(false)
 , m_bUAVLoadAdditionalFormats(false)
 , m_bLevel9ComparisonFiltering(false)
-, m_bCSRawAndStructuredViaShader4X(false)
 , m_b64UAVs(false)
 , m_UAVsAtEveryStage(false)
+, m_bCSRawAndStructuredViaShader4X(false)
 , m_bROVS(false)
 , m_bWaveOps(false)
 , m_bInt64Ops(false)
@@ -925,8 +926,8 @@ void DxilModule::LoadDxilSamplerFromMDNode(llvm::MDNode *MD, DxilSampler &S) {
 template <typename TResource>
 static void RemoveResources(std::vector<std::unique_ptr<TResource>> &vec,
                     std::unordered_set<unsigned> &immResID) {
-  for (std::vector<std::unique_ptr<TResource>>::iterator p = vec.begin(); p != vec.end();) {
-    std::vector<std::unique_ptr<TResource>>::iterator c = p++;
+  for (auto p = vec.begin(); p != vec.end();) {
+    auto c = p++;
     if (immResID.count((*c)->GetID()) == 0) {
       p = vec.erase(c);
     }
@@ -939,7 +940,7 @@ static void CollectUsedResource(Value *resID,
     return;
 
   usedResID.insert(resID);
-  if (ConstantInt *cResID = dyn_cast<ConstantInt>(resID)) {
+  if (dyn_cast<ConstantInt>(resID)) {
     // Do nothing
   } else if (ZExtInst *ZEI = dyn_cast<ZExtInst>(resID)) {
     if (ZEI->getSrcTy()->isIntegerTy()) {
@@ -1681,10 +1682,27 @@ void DxilModule::StripDebugRelatedCode() {
       }
     }
   }
+  // Remove dx.source metadata.
+  if (NamedMDNode *contents = m_pModule->getNamedMetadata(
+          DxilMDHelper::kDxilSourceContentsMDName)) {
+    contents->eraseFromParent();
+  }
+  if (NamedMDNode *defines =
+          m_pModule->getNamedMetadata(DxilMDHelper::kDxilSourceDefinesMDName)) {
+    defines->eraseFromParent();
+  }
+  if (NamedMDNode *mainFileName = m_pModule->getNamedMetadata(
+          DxilMDHelper::kDxilSourceMainFileNameMDName)) {
+    mainFileName->eraseFromParent();
+  }
+  if (NamedMDNode *arguments =
+          m_pModule->getNamedMetadata(DxilMDHelper::kDxilSourceArgsMDName)) {
+    arguments->eraseFromParent();
+  }
 }
 DebugInfoFinder &DxilModule::GetOrCreateDebugInfoFinder() {
   if (m_pDebugInfoFinder == nullptr) {
-    m_pDebugInfoFinder = std::make_unique<llvm::DebugInfoFinder>();
+    m_pDebugInfoFinder = llvm::make_unique<llvm::DebugInfoFinder>();
     m_pDebugInfoFinder->processModule(*m_pModule);
   }
   return *m_pDebugInfoFinder;
@@ -1763,7 +1781,7 @@ namespace llvm {
 hlsl::DxilModule &Module::GetOrCreateDxilModule(bool skipInit) {
   std::unique_ptr<hlsl::DxilModule> M;
   if (!HasDxilModule()) {
-    M = std::make_unique<hlsl::DxilModule>(this);
+    M = llvm::make_unique<hlsl::DxilModule>(this);
     if (!skipInit) {
       M->LoadDxilMetadata();
     }

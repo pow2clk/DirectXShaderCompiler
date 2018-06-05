@@ -1,5 +1,4 @@
 # See docs/CMake.html for instructions about how to build LLVM with CMake.
-
 cmake_minimum_required(VERSION 2.8.12.2)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -84,9 +83,22 @@ option(HLSL_ENABLE_FIXED_VER "Sets up fixed version information." OFF) # HLSL Ch
 option(HLSL_ENABLE_ANALYZE "Enables compiler analysis during compilation." OFF) # HLSL Change
 option(HLSL_OPTIONAL_PROJS_IN_DEFAULT "Include optional projects in default build target." OFF) # HLSL Change
 
+# HLSL Change Starts - set flag for Appveyor CI
+if ( "$ENV{CI}" AND "$ENV{APPVEYOR}" )
+  add_definitions(-DDXC_ON_APPVEYOR_CI)
+endif()
+# HLSL Change ends
+
 # SPIRV change starts
 option(ENABLE_SPIRV_CODEGEN "Enables SPIR-V code generation." OFF)
 option(SPIRV_BUILD_TESTS "Build targets for the SPIR-V unit tests." OFF)
+
+# Enable SPIR-V CodeGen for Linux by default.
+if(NOT WIN32)
+  set(ENABLE_SPIRV_CODEGEN ON)
+  set(SPIRV_BUILD_TESTS ON)
+endif()
+
 if (${SPIRV_BUILD_TESTS})
   set(ENABLE_SPIRV_CODEGEN ON)
 endif()
@@ -423,6 +435,7 @@ endif (LLVM_USE_OPROFILE)
 
 # HLSL Change: use 'Unknown' in place of "${LLVM_NATIVE_ARCH}"
 message(STATUS "Constructing LLVMBuild project information")
+
 execute_process(
   COMMAND ${PYTHON_EXECUTABLE} ${LLVMBUILDTOOL}
             --native-target Unknown
@@ -584,7 +597,9 @@ endif( ${CMAKE_SYSTEM_NAME} MATCHES SunOS )
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
 # enable warnings as errors for debug build
-SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
+if (WIN32)
+  SET(CMAKE_CXX_FLAGS_DEBUG  "${CMAKE_CXX_FLAGS_DEBUG} /WX")
+endif (WIN32)
 
 include(AddLLVM)
 include(TableGen)

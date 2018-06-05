@@ -21,20 +21,10 @@ include_directories(
 
 if(WIN32)
   add_definitions(-DGTEST_OS_WINDOWS=1)
-  # GoogleTest uses std::tr1, which is deprecated in VS2017.
-  # The following is an escape-hatch macro to silence the deprecation warnings.
-  add_definitions(-D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING)
-endif()
-
-if(SUPPORTS_VARIADIC_MACROS_FLAG)
-  add_definitions("-Wno-variadic-macros")
-endif()
-if(SUPPORTS_GNU_ZERO_VARIADIC_MACRO_ARGUMENTS_FLAG)
-  add_definitions("-Wno-gnu-zero-variadic-macro-arguments")
-endif()
-if(CXX_SUPPORTS_COVERED_SWITCH_DEFAULT_FLAG)
-  add_definitions("-Wno-covered-switch-default")
-endif()
+else(WIN32)
+  # Disable all warnings in subproject googletest
+  add_compile_options(-w)
+endif(WIN32)
 
 set(LLVM_REQUIRES_RTTI 1)
 add_definitions( -DGTEST_HAS_RTTI=0 )

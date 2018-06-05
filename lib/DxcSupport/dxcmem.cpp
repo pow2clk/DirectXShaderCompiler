@@ -10,12 +10,16 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "dxc/Support/Global.h"
+#ifdef _WIN32
 #include <specstrings.h>
+#endif
 
 #include "dxc/Support/WinIncludes.h"
+#include "llvm/Support/ThreadLocal.h"
+#include "llvm/Support/WinFunctions.h"
 #include <memory>
 
-static DWORD g_ThreadMallocTlsIndex;
+static llvm::sys::ThreadLocal<IMalloc> *g_ThreadMallocTls;
 static IMalloc *g_pDefaultMalloc;
 
 // Used by DllMain to set up and tear down per-thread tracking.
@@ -32,63 +36,64 @@ IMalloc *DxcGetThreadMallocNoRef() throw();
 _Ret_maybenull_ _Post_writable_byte_size_(nBytes) void *DxcThreadAlloc(size_t nBytes) throw();
 void DxcThreadFree(void *) throw();
 
-HRESULT DxcInitThreadMalloc() {
-  DXASSERT(g_ThreadMallocTlsIndex == 0, "else InitThreadMalloc already called");
+HRESULT DxcInitThreadMalloc() throw() {
+  DXASSERT(g_ThreadMallocTls == nullptr, "else InitThreadMalloc already called");
   DXASSERT(g_pDefaultMalloc == nullptr, "else InitThreadMalloc already called");
 
   // We capture the default malloc early to avoid potential failures later on.
   HRESULT hrMalloc = CoGetMalloc(1, &g_pDefaultMalloc);
   if (FAILED(hrMalloc)) return hrMalloc;
 
-  g_ThreadMallocTlsIndex = TlsAlloc();
-  if (g_ThreadMallocTlsIndex == TLS_OUT_OF_INDEXES) {
-    g_ThreadMallocTlsIndex = 0;
+  g_ThreadMallocTls = (llvm::sys::ThreadLocal<IMalloc>*)g_pDefaultMalloc->Alloc(sizeof(llvm::sys::ThreadLocal<IMalloc>));
+  if (g_ThreadMallocTls == nullptr) {
     g_pDefaultMalloc->Release();
     g_pDefaultMalloc = nullptr;
     return E_OUTOFMEMORY;
   }
+  g_ThreadMallocTls = new(g_ThreadMallocTls) llvm::sys::ThreadLocal<IMalloc>;
 
   return S_OK;
 }
 
-void DxcCleanupThreadMalloc() {
-  if (g_ThreadMallocTlsIndex) {
-    TlsFree(g_ThreadMallocTlsIndex);
-    g_ThreadMallocTlsIndex = 0;
-    DXASSERT(g_pDefaultMalloc, "else DxcInitThreadMalloc didn't work/fail atomically");
+void DxcCleanupThreadMalloc() throw() {
+  if (g_ThreadMallocTls) {
+    g_ThreadMallocTls->llvm::sys::ThreadLocal<IMalloc>::~ThreadLocal();
+    g_pDefaultMalloc->Free(g_ThreadMallocTls);
+    g_ThreadMallocTls = nullptr;
     g_pDefaultMalloc->Release();
     g_pDefaultMalloc = nullptr;
   }
 }
 
-IMalloc *DxcGetThreadMallocNoRef() {
-  DXASSERT(g_ThreadMallocTlsIndex != 0, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
-  return reinterpret_cast<IMalloc *>(TlsGetValue(g_ThreadMallocTlsIndex));
+IMalloc *DxcGetThreadMallocNoRef() throw() {
+  DXASSERT(g_ThreadMallocTls != nullptr, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
+  return g_ThreadMallocTls->get();
 }
-void DxcClearThreadMalloc() {
-  DXASSERT(g_ThreadMallocTlsIndex != 0, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
+
+void DxcClearThreadMalloc() throw() {
+  DXASSERT(g_ThreadMallocTls != nullptr, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
   IMalloc *pMalloc = DxcGetThreadMallocNoRef();
-  DXVERIFY_NOMSG(TlsSetValue(g_ThreadMallocTlsIndex, nullptr));
+  g_ThreadMallocTls->erase();
   pMalloc->Release();
 }
-void DxcSetThreadMalloc(IMalloc *pMalloc) {
-  DXASSERT(g_ThreadMallocTlsIndex != 0, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
+void DxcSetThreadMalloc(IMalloc *pMalloc) throw() {
+  DXASSERT(g_ThreadMallocTls != nullptr, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
   DXASSERT(DxcGetThreadMallocNoRef() == nullptr, "else nested allocation invoked");
-  DXVERIFY_NOMSG(TlsSetValue(g_ThreadMallocTlsIndex, pMalloc));
+  g_ThreadMallocTls->set(pMalloc);
   pMalloc->AddRef();
 }
-void DxcSetThreadMallocOrDefault(IMalloc *pMalloc) {
+void DxcSetThreadMallocOrDefault(IMalloc *pMalloc) throw() {
   DxcSetThreadMalloc(pMalloc ? pMalloc : g_pDefaultMalloc);
 }
-IMalloc *DxcSwapThreadMalloc(IMalloc *pMalloc, IMalloc **ppPrior) {
-  DXASSERT(g_ThreadMallocTlsIndex != 0, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
+IMalloc *DxcSwapThreadMalloc(IMalloc *pMalloc, IMalloc **ppPrior) throw() {
+  DXASSERT(g_ThreadMallocTls != nullptr, "else prior to DxcInitThreadMalloc or after DxcCleanupThreadMalloc");
   IMalloc *pPrior = DxcGetThreadMallocNoRef();
   if (ppPrior) {
     *ppPrior = pPrior;
   }
-  DXVERIFY_NOMSG(TlsSetValue(g_ThreadMallocTlsIndex, pMalloc));
+  g_ThreadMallocTls->set(pMalloc);
   return pMalloc;
 }
-IMalloc *DxcSwapThreadMallocOrDefault(IMalloc *pMallocOrNull, IMalloc **ppPrior) {
+IMalloc *DxcSwapThreadMallocOrDefault(IMalloc *pMallocOrNull, IMalloc **ppPrior) throw() {
   return DxcSwapThreadMalloc(pMallocOrNull ? pMallocOrNull : g_pDefaultMalloc, ppPrior);
 }

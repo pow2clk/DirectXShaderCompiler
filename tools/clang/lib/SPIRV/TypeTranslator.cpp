@@ -24,9 +24,6 @@ namespace {
 /// The alignment for 4-component float vectors.
 constexpr uint32_t kStd140Vec4Alignment = 16u;
 
-/// Returns true if the given value is a power of 2.
-inline bool isPow2(int val) { return (val & (val - 1)) == 0; }
-
 /// Rounds the given value up to the given power of 2.
 inline uint32_t roundToPow2(uint32_t val, uint32_t pow2) {
   assert(pow2 != 0);
@@ -172,10 +169,10 @@ void TypeTranslator::LiteralTypeHint::setHint(QualType ty) {
 }
 
 TypeTranslator::LiteralTypeHint::LiteralTypeHint(TypeTranslator &t)
-    : translator(t), type({}) {}
+    : type({}), translator(t) {}
 
 TypeTranslator::LiteralTypeHint::LiteralTypeHint(TypeTranslator &t, QualType ty)
-    : translator(t), type(ty) {
+    : type(ty), translator(t) {
   if (!isLiteralType(type))
     translator.pushIntendedLiteralType(type);
 }
@@ -322,7 +319,7 @@ uint32_t TypeTranslator::getLocationCount(QualType type) {
            static_cast<uint32_t>(arrayType->getSize().getZExtValue());
 
   // Struct type
-  if (const auto *structType = type->getAs<RecordType>()) {
+  if (type->getAs<RecordType>()) {
     assert(false && "all structs should already be flattened");
     return 0;
   }
@@ -671,39 +668,6 @@ uint32_t TypeTranslator::getACSBufferCounter() {
                                   decorations);
 }
 
-uint32_t TypeTranslator::getGlPerVertexStruct(
-    uint32_t clipArraySize, uint32_t cullArraySize, llvm::StringRef name,
-    const llvm::SmallVector<std::string, 4> &fieldSemantics) {
-  const uint32_t f32Type = theBuilder.getFloat32Type();
-  const uint32_t v4f32Type = theBuilder.getVecType(f32Type, 4);
-  const uint32_t clipType = theBuilder.getArrayType(
-      f32Type, theBuilder.getConstantUint32(clipArraySize));
-  const uint32_t cullType = theBuilder.getArrayType(
-      f32Type, theBuilder.getConstantUint32(cullArraySize));
-
-  auto &ctx = *theBuilder.getSPIRVContext();
-  llvm::SmallVector<const Decoration *, 1> decorations;
-
-  decorations.push_back(Decoration::getBuiltIn(ctx, spv::BuiltIn::Position, 0));
-  decorations.push_back(
-      Decoration::getBuiltIn(ctx, spv::BuiltIn::PointSize, 1));
-  decorations.push_back(
-      Decoration::getBuiltIn(ctx, spv::BuiltIn::ClipDistance, 2));
-  decorations.push_back(
-      Decoration::getBuiltIn(ctx, spv::BuiltIn::CullDistance, 3));
-  decorations.push_back(Decoration::getBlock(ctx));
-
-  if (spirvOptions.enableReflect) {
-    for (uint32_t i = 0; i < 4; ++i)
-      if (!fieldSemantics[i].empty())
-        decorations.push_back(
-            Decoration::getHlslSemanticGOOGLE(ctx, fieldSemantics[i], i));
-  }
-
-  return theBuilder.getStructType({v4f32Type, f32Type, clipType, cullType},
-                                  name, {}, decorations);
-}
-
 bool TypeTranslator::isScalarType(QualType type, QualType *scalarType) {
   bool isScalar = false;
   QualType ty = {};
@@ -792,6 +756,79 @@ bool TypeTranslator::isOrContainsAKindOfStructuredOrByteBuffer(QualType type) {
     }
   }
   return false;
+}
+
+bool TypeTranslator::isOrContains16BitType(QualType type) {
+  // Primitive types
+  {
+    QualType ty = {};
+    if (isScalarType(type, &ty)) {
+      if (const auto *builtinType = ty->getAs<BuiltinType>()) {
+        switch (builtinType->getKind()) {
+        case BuiltinType::Short:
+        case BuiltinType::UShort:
+        case BuiltinType::Min12Int:
+        case BuiltinType::Half:
+        case BuiltinType::Min10Float: {
+          return spirvOptions.enable16BitTypes;
+        }
+        default:
+          return false;
+        }
+      }
+    }
+  }
+
+  // Vector types
+  {
+    QualType elemType = {};
+    if (isVectorType(type, &elemType))
+      return isOrContains16BitType(elemType);
+  }
+
+  // Matrix types
+  {
+    QualType elemType = {};
+    if (isMxNMatrix(type, &elemType)) {
+      return isOrContains16BitType(elemType);
+    }
+  }
+
+  // Struct type
+  if (const auto *structType = type->getAs<RecordType>()) {
+    const auto *decl = structType->getDecl();
+
+    for (const auto *field : decl->fields()) {
+      if (isOrContains16BitType(field->getType()))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Array type
+  if (const auto *arrayType = type->getAsArrayTypeUnsafe()) {
+    return isOrContains16BitType(arrayType->getElementType());
+  }
+
+  // Reference types
+  if (const auto *refType = type->getAs<ReferenceType>()) {
+    return isOrContains16BitType(refType->getPointeeType());
+  }
+
+  // Pointer types
+  if (const auto *ptrType = type->getAs<PointerType>()) {
+    return isOrContains16BitType(ptrType->getPointeeType());
+  }
+
+  if (const auto *typedefType = type->getAs<TypedefType>()) {
+    return isOrContains16BitType(typedefType->desugar());
+  }
+
+  emitError("checking 16-bit type for %0 unimplemented")
+      << type->getTypeClassName();
+  type->dump();
+  return 0;
 }
 
 bool TypeTranslator::isStructuredBuffer(QualType type) {
@@ -995,7 +1032,7 @@ bool TypeTranslator::isOrContainsNonFpColMajorMatrix(QualType type,
                                                      const Decl *decl) const {
   const auto isColMajorDecl = [this](const Decl *decl) {
     return decl->hasAttr<HLSLColumnMajorAttr>() ||
-           !decl->hasAttr<HLSLRowMajorAttr>() && !spirvOptions.defaultRowMajor;
+           (!decl->hasAttr<HLSLRowMajorAttr>() && !spirvOptions.defaultRowMajor);
   };
 
   QualType elemType = {};
@@ -1345,8 +1382,7 @@ TypeTranslator::collectDeclsInDeclContext(const DeclContext *declContext) {
   return decls;
 }
 
-uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule,
-                                               bool isDepthCmp) {
+uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule) {
   // Resource types are either represented like C struct or C++ class in the
   // AST. Samplers are represented like C struct, so isStructureType() will
   // return true for it; textures are represented like C++ class, so
@@ -1376,7 +1412,7 @@ uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule,
       const auto isMS = (name == "Texture2DMS" || name == "Texture2DMSArray");
       const auto sampledType = hlsl::GetHLSLResourceResultType(type);
       return theBuilder.getImageType(translateType(getElementType(sampledType)),
-                                     dim, isDepthCmp, isArray, isMS);
+                                     dim, /*depth*/ 2, isArray, isMS);
     }
 
     // There is no RWTexture3DArray
@@ -1388,7 +1424,7 @@ uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule,
       const auto sampledType = hlsl::GetHLSLResourceResultType(type);
       const auto format = translateSampledTypeToImageFormat(sampledType);
       return theBuilder.getImageType(translateType(getElementType(sampledType)),
-                                     dim, /*depth*/ 0, isArray, /*MS*/ 0,
+                                     dim, /*depth*/ 2, isArray, /*MS*/ 0,
                                      /*Sampled*/ 2u, format);
     }
   }
@@ -1484,7 +1520,7 @@ uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule,
     const auto format = translateSampledTypeToImageFormat(sampledType);
     return theBuilder.getImageType(
         translateType(getElementType(sampledType)), spv::Dim::Buffer,
-        /*depth*/ 0, /*isArray*/ 0, /*ms*/ 0,
+        /*depth*/ 2, /*isArray*/ 0, /*ms*/ 0,
         /*sampled*/ name == "Buffer" ? 1 : 2, format);
   }
 
@@ -1514,7 +1550,7 @@ uint32_t TypeTranslator::translateResourceType(QualType type, LayoutRule rule,
     const auto sampledType = hlsl::GetHLSLResourceResultType(type);
     return theBuilder.getImageType(
         translateType(getElementType(sampledType)), spv::Dim::SubpassData,
-        /*depth*/ 0, /*isArray*/ false, /*ms*/ name == "SubpassInputMS",
+        /*depth*/ 2, /*isArray*/ false, /*ms*/ name == "SubpassInputMS",
         /*sampled*/ 2);
   }
 
@@ -1674,6 +1710,16 @@ TypeTranslator::getAlignmentAndSize(QualType type, LayoutRule rule,
         case BuiltinType::LongLong:
         case BuiltinType::ULongLong:
           return {8, 8};
+        case BuiltinType::Short:
+        case BuiltinType::UShort:
+        case BuiltinType::Min12Int:
+        case BuiltinType::Half:
+        case BuiltinType::Min10Float: {
+          if (spirvOptions.enable16BitTypes)
+            return {2, 2};
+          else
+            return {4, 4};
+        }
         default:
           emitError("alignment and size calculation for type %0 unimplemented")
               << type;
@@ -1832,6 +1878,22 @@ std::string TypeTranslator::getName(QualType type) {
           return "uint";
         case BuiltinType::Float:
           return "float";
+        case BuiltinType::Double:
+          return "double";
+        case BuiltinType::LongLong:
+          return "int64";
+        case BuiltinType::ULongLong:
+          return "uint64";
+        case BuiltinType::Short:
+          return "short";
+        case BuiltinType::UShort:
+          return "ushort";
+        case BuiltinType::Half:
+          return "half";
+        case BuiltinType::Min12Int:
+          return "min12int";
+        case BuiltinType::Min10Float:
+          return "min10float";
         default:
           return "";
         }

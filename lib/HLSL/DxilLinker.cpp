@@ -573,8 +573,7 @@ DxilLinkJob::Link(std::pair<DxilFunctionLinkInfo *, DxilLib *> &entryLinkPair,
     if (!NewF->hasFnAttribute(llvm::Attribute::NoInline))
       NewF->addFnAttr(llvm::Attribute::AlwaysInline);
 
-    if (DxilFunctionAnnotation *funcAnnotation =
-            tmpTypeSys.GetFunctionAnnotation(F)) {
+    if (tmpTypeSys.GetFunctionAnnotation(F)) {
       // Clone funcAnnotation to typeSys.
       typeSys.CopyFunctionAnnotation(NewF, F, tmpTypeSys);
     }
@@ -595,7 +594,7 @@ DxilLinkJob::Link(std::pair<DxilFunctionLinkInfo *, DxilLib *> &entryLinkPair,
     // Add signature.
     DxilEntrySignature &entrySig = entryDM.GetDxilEntrySignature(entryFunc);
     std::unique_ptr<DxilEntrySignature> newSig =
-        std::make_unique<DxilEntrySignature>(entrySig);
+        llvm::make_unique<DxilEntrySignature>(entrySig);
     DM.ResetEntrySignature(newSig.release());
   }
 
@@ -768,7 +767,7 @@ bool DxilLinkerImpl::RegisterLib(StringRef name,
 
   pM->setModuleIdentifier(name);
   std::unique_ptr<DxilLib> pLib =
-      std::make_unique<DxilLib>(std::move(pM));
+      llvm::make_unique<DxilLib>(std::move(pM));
   m_LibMap[name] = std::move(pLib);
   return true;
 }

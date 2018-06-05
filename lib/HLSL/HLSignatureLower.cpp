@@ -505,8 +505,8 @@ void replaceStWithStOutput(Function *stOutput, StoreInst *stInst,
     Value *colIdx = Builder.getInt8(0);
     ArrayType *AT = cast<ArrayType>(val->getType());
     Value *args[] = {OpArg, outputID, idx, colIdx, /*val*/ nullptr};
-    args;
-    AT;
+    (void)args;
+    (void)AT;
   }
 }
 
@@ -618,7 +618,7 @@ void replaceDirectInputParameter(Value *param, Function *loadInput,
     param->replaceAllUsesWith(input);
   } else if (HLMatrixLower::IsMatrixType(Ty)) {
     Value *colIdx = hlslOP->GetU8Const(0);
-    colIdx;
+    (void)colIdx;
     DXASSERT(param->hasOneUse(),
              "matrix arg should only has one use as matrix to vec");
     CallInst *CI = cast<CallInst>(param->user_back());
@@ -692,9 +692,9 @@ struct InputOutputAccessInfo {
   // Load/Store/LoadMat/StoreMat on input/output.
   Instruction *user;
   InputOutputAccessInfo(Value *index, Instruction *I)
-      : idx(index), user(I), vertexID(nullptr), vectorIdx(nullptr) {}
+      : idx(index), vertexID(nullptr), vectorIdx(nullptr), user(I) {}
   InputOutputAccessInfo(Value *index, Instruction *I, Value *ID, Value *vecIdx)
-      : idx(index), user(I), vertexID(ID), vectorIdx(vecIdx) {}
+      : idx(index), vertexID(ID), vectorIdx(vecIdx), user(I) {}
 };
 
 void collectInputOutputAccessInfo(
@@ -889,7 +889,7 @@ void GenerateInputOutputUserCall(InputOutputAccessInfo &info, Value *undefVertex
     if (group == HLOpcodeGroup::HLIntrinsic)
       return;
     unsigned opcode = GetHLOpcode(CI);
-    DXASSERT(group == HLOpcodeGroup::HLMatLoadStore, "");
+    DXASSERT_NOMSG(group == HLOpcodeGroup::HLMatLoadStore);
     HLMatLoadStoreOpcode matOp = static_cast<HLMatLoadStoreOpcode>(opcode);
     switch (matOp) {
     case HLMatLoadStoreOpcode::ColMatLoad: {
@@ -1432,14 +1432,6 @@ void HLSignatureLower::GenerateClipPlanesForVS(Value *outPosition) {
 }
 
 namespace {
-// Helper functions for Gs Streams.
-void GenerateStOutput(Function *stOutput, Value *eltVal, Value *outputID,
-                      Value *rowIdx, Value *colIdx, OP *hlslOP,
-                      IRBuilder<> Builder) {
-  Constant *OpArg = hlslOP->GetU32Const((unsigned)OP::OpCode::StoreOutput);
-  Builder.CreateCall(stOutput, {OpArg, outputID, rowIdx, colIdx, eltVal});
-}
-
 Value *TranslateStreamAppend(CallInst *CI, unsigned ID, hlsl::OP *OP) {
   Function *DxilFunc = OP->GetOpFunc(OP::OpCode::EmitStream, CI->getType());
   // TODO: generate a emit which has the data being emited as its argment.
@@ -1476,7 +1468,7 @@ void HLSignatureLower::GenerateStreamOutputOperation(Value *streamVal, unsigned 
     CallInst *CI = cast<CallInst>(user);
     HLOpcodeGroup group = GetHLOpcodeGroupByName(CI->getCalledFunction());
     unsigned opcode = GetHLOpcode(CI);
-    DXASSERT_LOCALVAR(group, group == HLOpcodeGroup::HLIntrinsic, "");
+    DXASSERT_LOCALVAR(group, group == HLOpcodeGroup::HLIntrinsic, "Must be HLIntrinsic here");
     IntrinsicOp IOP = static_cast<IntrinsicOp>(opcode);
     switch (IOP) {
     case IntrinsicOp::MOP_Append:

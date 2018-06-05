@@ -97,10 +97,14 @@ public:
 
 static void raw_string_ostream_to_CoString(raw_string_ostream &o, _Outptr_result_z_ LPSTR *pResult) {
   std::string& s = o.str(); // .str() will flush automatically
+  #ifdef _WIN32
   *pResult = (LPSTR)CoTaskMemAlloc(s.size() + 1);
+  #else
+  *pResult = (LPSTR)malloc(s.size() + 1);
+  #endif
   if (*pResult == nullptr) 
     throw std::bad_alloc();
-  strcpy_s(*pResult, s.size() + 1, s.c_str());
+  strncpy(*pResult, s.c_str(), s.size() + 1);
 }
 
 static
@@ -339,7 +343,7 @@ HRESULT DoRewriteUnused(_In_ DxcLangExtensionsHelper *pHelper,
   // Setup a compiler instance.
   CompilerInstance compiler;
   std::unique_ptr<TextDiagnosticPrinter> diagPrinter =
-      std::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());  
+      llvm::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());  
   SetupCompilerForRewrite(compiler, pHelper, pFileName, diagPrinter.get(), pRemap, pDefines);
 
   // Parse the source file.
@@ -500,7 +504,7 @@ HRESULT DoSimpleReWrite(_In_ DxcLangExtensionsHelper *pHelper,
   // Setup a compiler instance.
   CompilerInstance compiler;
   std::unique_ptr<TextDiagnosticPrinter> diagPrinter =
-      std::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());    
+      llvm::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());    
   SetupCompilerForRewrite(compiler, pHelper, pFileName, diagPrinter.get(), pRemap, pDefines);
 
   // Parse the source file.
@@ -547,7 +551,7 @@ public:
   DXC_MICROCOM_TM_CTOR(DxcRewriter)
   DXC_LANGEXTENSIONS_HELPER_IMPL(m_langExtensionsHelper)
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcRewriter, IDxcLangExtensions>(this, iid, ppvObject);
   }
 
@@ -574,7 +578,6 @@ public:
       ::llvm::sys::fs::MSFileSystem* msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -617,7 +620,6 @@ public:
       ::llvm::sys::fs::MSFileSystem* msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -666,7 +668,6 @@ public:
     try {
       dxcutil::DxcArgsFileSystem *msfPtr = dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -698,7 +699,7 @@ public:
       defineStr += "#define ";
       defineStr += utf8Name;
       defineStr += " ";
-      defineStr += utf8Value ? utf8Value : "1";
+      defineStr += utf8Value ? utf8Value.m_psz : "1";
       defineStr += "\n";
     }
 

@@ -14,7 +14,7 @@
 #define __DXC_DXILLIB__
 
 #include "dxc/Support/WinIncludes.h"
-
+#include "llvm/Support/WinSAL.h"
 
 // Initialize Dxil library. 
 HRESULT DxilLibInitialize();

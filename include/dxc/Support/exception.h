@@ -10,10 +10,11 @@
 
 #pragma once
 
-#include "dxc/Support/ErrorCodes.h"
 #include <exception>
 #include <string>
 
+#include "dxc/Support/ErrorCodes.h"
+#include "llvm/Support/WinTypes.h" // SPIRV Change
 
 namespace hlsl
 {

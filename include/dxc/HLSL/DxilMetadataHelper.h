@@ -29,7 +29,7 @@ class MDTuple;
 class MDNode;
 class NamedMDNode;
 class GlobalVariable;
-};
+}
 
 namespace hlsl {
 
@@ -80,6 +80,12 @@ public:
 
   // ViewId state.
   static const char kDxilViewIdStateMDName[];
+
+  // Source info.
+  static const char kDxilSourceContentsMDName[];
+  static const char kDxilSourceDefinesMDName[];
+  static const char kDxilSourceMainFileNameMDName[];
+  static const char kDxilSourceArgsMDName[];
 
   // Function props.
   static const char kDxilFunctionPropertiesMDName[];

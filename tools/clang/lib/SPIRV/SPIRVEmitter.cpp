@@ -24,15 +24,6 @@ namespace spirv {
 
 namespace {
 
-/// Returns the type of the given decl. If the given decl is a FunctionDecl,
-/// returns its result type.
-inline QualType getTypeOrFnRetType(const ValueDecl *decl) {
-  if (const auto *funcDecl = dyn_cast<FunctionDecl>(decl)) {
-    return funcDecl->getReturnType();
-  }
-  return decl->getType();
-}
-
 // Returns true if the given decl has the given semantic.
 bool hasSemantic(const DeclaratorDecl *decl,
                  hlsl::DXIL::SemanticKind semanticKind) {
@@ -752,9 +743,9 @@ void SPIRVEmitter::doStmt(const Stmt *stmt,
     doIfStmt(ifStmt, attrs);
   } else if (const auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
     doSwitchStmt(switchStmt, attrs);
-  } else if (const auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
+  } else if (dyn_cast<CaseStmt>(stmt)) {
     processCaseStmtOrDefaultStmt(stmt);
-  } else if (const auto *defaultStmt = dyn_cast<DefaultStmt>(stmt)) {
+  } else if (dyn_cast<DefaultStmt>(stmt)) {
     processCaseStmtOrDefaultStmt(stmt);
   } else if (const auto *breakStmt = dyn_cast<BreakStmt>(stmt)) {
     doBreakStmt(breakStmt);
@@ -768,7 +759,7 @@ void SPIRVEmitter::doStmt(const Stmt *stmt,
     doWhileStmt(whileStmt, attrs);
   } else if (const auto *forStmt = dyn_cast<ForStmt>(stmt)) {
     doForStmt(forStmt, attrs);
-  } else if (const auto *nullStmt = dyn_cast<NullStmt>(stmt)) {
+  } else if (dyn_cast<NullStmt>(stmt)) {
     // For the null statement ";". We don't need to do anything.
   } else if (const auto *expr = dyn_cast<Expr>(stmt)) {
     // All cases for expressions used as statements
@@ -1141,7 +1132,7 @@ bool SPIRVEmitter::validateVKAttributes(const NamedDecl *decl) {
     }
   }
 
-  if (const auto *iaiAttr = decl->getAttr<VKInputAttachmentIndexAttr>()) {
+  if (decl->getAttr<VKInputAttachmentIndexAttr>()) {
     if (!shaderModel.IsPS()) {
       emitError("SubpassInput(MS) only allowed in pixel shader",
                 decl->getLocation());
@@ -1213,11 +1204,13 @@ void SPIRVEmitter::doHLSLBufferDecl(const HLSLBufferDecl *bufferDecl) {
   // supported in Vulkan
   for (const auto *member : bufferDecl->decls()) {
     if (const auto *varMember = dyn_cast<VarDecl>(member)) {
-      if (const auto *init = varMember->getInit())
-        emitWarning("%select{tbuffer|cbuffer}0 member initializer "
-                    "ignored since no Vulkan equivalent",
-                    init->getExprLoc())
-            << bufferDecl->isCBuffer() << init->getSourceRange();
+      if (!spirvOptions.noWarnIgnoredFeatures) {
+        if (const auto *init = varMember->getInit())
+          emitWarning("%select{tbuffer|cbuffer}0 member initializer "
+                      "ignored since no Vulkan equivalent",
+                      init->getExprLoc())
+              << bufferDecl->isCBuffer() << init->getSourceRange();
+      }
 
       // We cannot handle external initialization of column-major matrices now.
       if (typeTranslator.isOrContainsNonFpColMajorMatrix(varMember->getType(),
@@ -1999,7 +1992,8 @@ SpirvEvalInfo SPIRVEmitter::processCall(const CallExpr *callExpr) {
   SpirvEvalInfo objectEvalInfo = 0; // EvalInfo for the object (if exists)
   bool needsTempVar = false;        // Whether we need temporary variable.
 
-  llvm::SmallVector<uint32_t, 4> params;    // Temporary variables
+  llvm::SmallVector<uint32_t, 4> vars;      // Variables for function call
+  llvm::SmallVector<bool, 4> isTempVar;     // Temporary variable or not
   llvm::SmallVector<SpirvEvalInfo, 4> args; // Evaluated arguments
 
   if (const auto *memberCall = dyn_cast<CXXMemberCallExpr>(callExpr)) {
@@ -2038,7 +2032,8 @@ SpirvEvalInfo SPIRVEmitter::processCall(const CallExpr *callExpr) {
       args.push_back(objectId);
       // We do not need to create a new temporary variable for the this
       // object. Use the evaluated argument.
-      params.push_back(args.back());
+      vars.push_back(args.back());
+      isTempVar.push_back(false);
     }
   }
 
@@ -2050,24 +2045,43 @@ SpirvEvalInfo SPIRVEmitter::processCall(const CallExpr *callExpr) {
     auto *arg = callExpr->getArg(i)->IgnoreParenLValueCasts();
     const auto *param = callee->getParamDecl(i);
 
-    // We need to create variables for holding the values to be used as
-    // arguments. The variables themselves are of pointer types.
-    const uint32_t varType =
-        declIdMapper.getTypeAndCreateCounterForPotentialAliasVar(param);
-    const std::string varName = "param.var." + param->getNameAsString();
-    const uint32_t tempVarId = theBuilder.addFnVar(varType, varName);
+    // Get the evaluation info if this argument is referencing some variable
+    // *as a whole*, in which case we can avoid creating the temporary variable
+    // for it if it is Function scope and can act as out parameter.
+    SpirvEvalInfo argInfo = 0;
+    if (const auto *declRefExpr = dyn_cast<DeclRefExpr>(arg)) {
+      argInfo = declIdMapper.getDeclEvalInfo(declRefExpr->getDecl());
+    }
 
-    params.push_back(tempVarId);
-    args.push_back(doExpr(arg));
+    if (argInfo && argInfo.getStorageClass() == spv::StorageClass::Function &&
+        canActAsOutParmVar(param)) {
+      vars.push_back(argInfo);
+      isTempVar.push_back(false);
+      args.push_back(doExpr(arg));
+    } else {
+      // We need to create variables for holding the values to be used as
+      // arguments. The variables themselves are of pointer types.
+      const uint32_t varType =
+          declIdMapper.getTypeAndCreateCounterForPotentialAliasVar(param);
+      const std::string varName = "param.var." + param->getNameAsString();
+      const uint32_t tempVarId = theBuilder.addFnVar(varType, varName);
 
-    // Update counter variable associated with function parameters
-    tryToAssignCounterVar(param, arg);
+      vars.push_back(tempVarId);
+      isTempVar.push_back(true);
+      args.push_back(doExpr(arg));
 
-    // Manually load the argument here
-    const auto rhsVal = loadIfGLValue(arg, args.back());
-    // Initialize the temporary variables using the contents of the arguments
-    storeValue(tempVarId, rhsVal, param->getType());
+      // Update counter variable associated with function parameters
+      tryToAssignCounterVar(param, arg);
+
+      // Manually load the argument here
+      const auto rhsVal = loadIfGLValue(arg, args.back());
+      // Initialize the temporary variables using the contents of the arguments
+      storeValue(tempVarId, rhsVal, param->getType());
+    }
   }
+
+  assert(vars.size() == isTempVar.size());
+  assert(vars.size() == args.size());
 
   // Push the callee into the work queue if it is not there.
   if (!workQueue.count(callee)) {
@@ -2079,26 +2093,25 @@ SpirvEvalInfo SPIRVEmitter::processCall(const CallExpr *callExpr) {
   // Get or forward declare the function <result-id>
   const uint32_t funcId = declIdMapper.getOrRegisterFnResultId(callee);
 
-  const uint32_t retVal =
-      theBuilder.createFunctionCall(retType, funcId, params);
+  const uint32_t retVal = theBuilder.createFunctionCall(retType, funcId, vars);
 
   // If we created a temporary variable for the lvalue object this method is
   // invoked upon, we need to copy the contents in the temporary variable back
   // to the original object's variable in case there are side effects.
   if (needsTempVar && !objectEvalInfo.isRValue()) {
     const uint32_t typeId = typeTranslator.translateType(objectType);
-    const uint32_t value = theBuilder.createLoad(typeId, params.front());
+    const uint32_t value = theBuilder.createLoad(typeId, vars.front());
     storeValue(objectEvalInfo, value, objectType);
   }
 
   // Go through all parameters and write those marked as out/inout
   for (uint32_t i = 0; i < numParams; ++i) {
     const auto *param = callee->getParamDecl(i);
-    if (canActAsOutParmVar(param)) {
+    if (isTempVar[i] && canActAsOutParmVar(param)) {
       const auto *arg = callExpr->getArg(i);
       const uint32_t index = i + isNonStaticMemberCall;
       const uint32_t typeId = typeTranslator.translateType(param->getType());
-      const uint32_t value = theBuilder.createLoad(typeId, params[index]);
+      const uint32_t value = theBuilder.createLoad(typeId, vars[index]);
 
       processAssignment(arg, value, false, args[index]);
     }
@@ -3720,11 +3733,11 @@ void SPIRVEmitter::handleOffsetInMethodCall(const CXXMemberCallExpr *expr,
   assert(index < expr->getNumArgs());
 
   *constOffset = *varOffset = 0; // Initialize both first
-  if (*constOffset = tryToEvaluateAsConst(expr->getArg(index)))
+  if ((*constOffset = tryToEvaluateAsConst(expr->getArg(index))))
     return; // Constant offset
   else
     *varOffset = doExpr(expr->getArg(index));
-};
+}
 
 SpirvEvalInfo
 SPIRVEmitter::processIntrinsicMemberCall(const CXXMemberCallExpr *expr,
@@ -4198,16 +4211,7 @@ SPIRVEmitter::processTextureSampleCmpCmpLevelZero(const CXXMemberCallExpr *expr,
   const uint32_t lod = isCmp ? 0 : theBuilder.getConstantFloat32(0);
 
   const auto retType = expr->getDirectCallee()->getReturnType();
-  // TODO: Hack. Drivers are expecting the Depth value in OpTypeImage to match
-  // the OpImageSample* instruction: Depth=0 for normal sampling, and Depth=1
-  // for depth-comparison sampling. That behavior is not what the spec says;
-  // Vulkan spec reads "The 'Depth' operand of OpTypeImage is ignored."
-  // We always generate OpTypeImage variables with Depth=0. Hack this only
-  // depth-comparison sampling code path to use Depth=1 for the OpTypeImage
-  // used by OpSampledImage. This causes inconsistent types in SPIR-V, but
-  // pleases drivers. Whatever.
-  const auto imageType = typeTranslator.translateResourceType(
-      imageExpr->getType(), LayoutRule::Void, /*isDepthCmp=*/true);
+  const auto imageType = typeTranslator.translateType(imageExpr->getType());
 
   return createImageSample(
       retType, imageType, image, sampler,
@@ -4786,6 +4790,8 @@ SpirvEvalInfo SPIRVEmitter::processAssignment(const Expr *lhs,
                                               const SpirvEvalInfo &rhs,
                                               const bool isCompoundAssignment,
                                               SpirvEvalInfo lhsPtr) {
+  lhs = lhs->IgnoreParenNoopCasts(astContext);
+
   // Assigning to vector swizzling should be handled differently.
   if (SpirvEvalInfo result = tryToAssignToVectorElements(lhs, rhs))
     return result;
@@ -4812,7 +4818,9 @@ SpirvEvalInfo SPIRVEmitter::processAssignment(const Expr *lhs,
 
 void SPIRVEmitter::storeValue(const SpirvEvalInfo &lhsPtr,
                               const SpirvEvalInfo &rhsVal,
-                              const QualType lhsValType) {
+                              QualType lhsValType) {
+  if (const auto *refType = lhsValType->getAs<ReferenceType>())
+    lhsValType = refType->getPointeeType();
 
   QualType matElemType = {};
   const bool lhsIsMat = typeTranslator.isMxNMatrix(lhsValType, &matElemType);
@@ -5371,7 +5379,7 @@ SpirvEvalInfo SPIRVEmitter::createVectorSplat(const Expr *scalarExpr,
 
   // Try to evaluate the element as constant first. If successful, then we
   // can generate constant instructions for this vector splat.
-  if (scalarVal = tryToEvaluateAsConst(scalarExpr)) {
+  if ((scalarVal = tryToEvaluateAsConst(scalarExpr))) {
     isConstVal = true;
   } else {
     scalarVal = doExpr(scalarExpr);
@@ -5863,7 +5871,6 @@ SPIRVEmitter::processMatrixBinaryOp(const Expr *lhs, const Expr *rhs,
   case BO_MulAssign:
   case BO_DivAssign:
   case BO_RemAssign: {
-    const uint32_t vecType = typeTranslator.getComponentVectorType(lhsType);
     const auto actOnEachVec = [this, spvOp, rhsVal](uint32_t index,
                                                     uint32_t vecType,
                                                     uint32_t lhsVec) {
@@ -7125,7 +7132,6 @@ uint32_t SPIRVEmitter::processIntrinsicModf(const CallExpr *callExpr) {
   const auto ipType = ipArg->getType();
   const auto returnType = callExpr->getType();
   const auto returnTypeId = typeTranslator.translateType(returnType);
-  const auto ipTypeId = typeTranslator.translateType(ipType);
   const uint32_t argId = doExpr(arg);
   const uint32_t ipId = doExpr(ipArg);
 
@@ -7567,9 +7573,7 @@ uint32_t SPIRVEmitter::processNonFpMatrixTranspose(QualType matType,
       TypeTranslator::isMxNMatrix(matType, &elemType, &numRows, &numCols);
   assert(isMat && !elemType->isFloatingType());
 
-  const auto rowQualType = astContext.getExtVectorType(elemType, numCols);
   const auto colQualType = astContext.getExtVectorType(elemType, numRows);
-  const uint32_t rowTypeId = typeTranslator.translateType(rowQualType);
   const uint32_t colTypeId = typeTranslator.translateType(colQualType);
   const uint32_t elemTypeId = typeTranslator.translateType(elemType);
 
@@ -7761,7 +7765,6 @@ uint32_t SPIRVEmitter::processNonFpMatrixTimesMatrix(QualType lhsType,
 }
 
 uint32_t SPIRVEmitter::processIntrinsicMul(const CallExpr *callExpr) {
-  const QualType returnType = callExpr->getType();
   const uint32_t returnTypeId =
       typeTranslator.translateType(callExpr->getType());
 
@@ -8433,11 +8436,11 @@ uint32_t SPIRVEmitter::processIntrinsicUsingSpirvInst(
       const auto actOnEachVec = [this, opcode](uint32_t /*index*/,
                                                uint32_t vecType,
                                                uint32_t curRowId) {
-        return theBuilder.createUnaryOp(opcode, vecType, {curRowId});
+        return theBuilder.createUnaryOp(opcode, vecType, curRowId);
       };
       return processEachVectorInMatrix(arg, argId, actOnEachVec);
     }
-    return theBuilder.createUnaryOp(opcode, returnType, {argId});
+    return theBuilder.createUnaryOp(opcode, returnType, argId);
   } else if (callExpr->getNumArgs() == 2u) {
     const Expr *arg0 = callExpr->getArg(0);
     const uint32_t arg0Id = doExpr(arg0);
@@ -8510,7 +8513,7 @@ uint32_t SPIRVEmitter::processIntrinsicUsingGLSLInst(
     // If the instruction does not operate on matrices, we can perform the
     // instruction on each vector of the matrix.
     if (actPerRowForMatrices && TypeTranslator::isMxNMatrix(arg0->getType())) {
-      const auto actOnEachVec = [this, glslInstSetId, opcode, arg0Id, arg1Id,
+      const auto actOnEachVec = [this, glslInstSetId, opcode, arg1Id,
                                  arg2Id](uint32_t index, uint32_t vecType,
                                          uint32_t arg0RowId) {
         const uint32_t arg1RowId =
@@ -9071,7 +9074,7 @@ bool SPIRVEmitter::processGeometryShaderAttributes(const FunctionDecl *decl,
 void SPIRVEmitter::processPixelShaderAttributes(const FunctionDecl *decl) {
   theBuilder.addExecutionMode(entryFunctionId,
                               spv::ExecutionMode::OriginUpperLeft, {});
-  if (auto *numThreadsAttr = decl->getAttr<HLSLEarlyDepthStencilAttr>()) {
+  if (decl->getAttr<HLSLEarlyDepthStencilAttr>()) {
     theBuilder.addExecutionMode(entryFunctionId,
                                 spv::ExecutionMode::EarlyFragmentTests, {});
   }
@@ -9443,11 +9446,12 @@ bool SPIRVEmitter::processHSEntryPointOutputAndPCF(
   // Now create a barrier before calling the Patch Constant Function (PCF).
   // Flags are:
   // Execution Barrier scope = Workgroup (2)
-  // Memory Barrier scope = Device (1)
+  // Memory Barrier scope = Invocation (4)
   // Memory Semantics Barrier scope = None (0)
-  theBuilder.createBarrier(theBuilder.getConstantUint32(2),
-                           theBuilder.getConstantUint32(4),
-                           theBuilder.getConstantUint32(0));
+  const auto constZero = theBuilder.getConstantUint32(0);
+  const auto constFour = theBuilder.getConstantUint32(4);
+  const auto constTwo = theBuilder.getConstantUint32(2);
+  theBuilder.createBarrier(constTwo, constFour, constZero);
 
   // The PCF should be called only once. Therefore, we check the invocationID,
   // and we only allow ID 0 to call the PCF.
@@ -9721,7 +9725,7 @@ void SPIRVEmitter::processSwitchStmtUsingIfStmts(const SwitchStmt *switchStmt) {
     // Accumulate all non-case/default/break statements as the body for the
     // current case.
     std::vector<Stmt *> statements;
-    for (int i = curCaseIndex + 1;
+    for (unsigned i = curCaseIndex + 1;
          i < flatSwitch.size() && !isa<BreakStmt>(flatSwitch[i]); ++i) {
       if (!isa<CaseStmt>(flatSwitch[i]) && !isa<DefaultStmt>(flatSwitch[i]))
         statements.push_back(const_cast<Stmt *>(flatSwitch[i]));

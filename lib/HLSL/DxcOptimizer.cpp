@@ -415,7 +415,11 @@ static HRESULT Utf8ToUtf16CoTaskMalloc(LPCSTR pValue, LPWSTR *ppResult) {
   if (ppResult == nullptr)
     return E_POINTER;
   int count = MultiByteToWideChar(CP_UTF8, 0, pValue, -1, nullptr, 0);
+  #ifdef _WIN32
   *ppResult = (wchar_t*)CoTaskMemAlloc(sizeof(wchar_t) * count);
+  #else
+  *ppResult = (wchar_t*)malloc(sizeof(wchar_t) * count);
+  #endif
   if (*ppResult == nullptr)
     return E_OUTOFMEMORY;
   MultiByteToWideChar(CP_UTF8, 0, pValue, -1, *ppResult, count);
@@ -433,7 +437,7 @@ public:
   DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL()
   DXC_MICROCOM_TM_CTOR(DxcOptimizerPass)
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcOptimizerPass>(this, iid, ppvObject);
   }
 
@@ -489,7 +493,7 @@ public:
   DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL()
   DXC_MICROCOM_TM_CTOR(DxcOptimizer)
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcOptimizer>(this, iid, ppvObject);
   }
 

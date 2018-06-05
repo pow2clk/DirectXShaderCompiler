@@ -165,6 +165,7 @@ public:
   bool VkUseGlLayout;                      // OPT_fvk_use_gl_layout
   bool VkUseDxLayout;                      // OPT_fvk_use_dx_layout
   bool SpvEnableReflect;                   // OPT_fspv_reflect
+  bool VkNoWarnIgnoredFeatures;            // OPT_Wno_vk_ignored_features
   llvm::StringRef VkStageIoOrder;          // OPT_fvk_stage_io_order
   llvm::SmallVector<int32_t, 4> VkBShift;  // OPT_fvk_b_shift
   llvm::SmallVector<int32_t, 4> VkTShift;  // OPT_fvk_t_shift
@@ -185,6 +186,7 @@ public:
 
   MainArgs() = default;
   MainArgs(int argc, const wchar_t **argv, int skipArgCount = 1);
+  MainArgs(int argc, const char **argv, int skipArgCount = 1);
   MainArgs(llvm::ArrayRef<llvm::StringRef> args);
   MainArgs& operator=(const MainArgs &other);
   llvm::ArrayRef<const char *> getArrayRef() const {

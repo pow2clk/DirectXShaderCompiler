@@ -36,7 +36,7 @@ public:
 
   DXC_MICROCOM_TM_ADDREF_RELEASE_IMPL()
   DXC_MICROCOM_TM_CTOR(DxcContainerBuilder)
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcContainerBuilder>(this, riid, ppvObject);
   }
 
@@ -168,7 +168,7 @@ HRESULT STDMETHODCALLTYPE DxcContainerBuilder::SerializeContainer(_Out_ IDxcOper
         CComPtr<IDxcBlob> pErrorResult;
         IFT(CreateMemoryStream(m_pMalloc, &pErrorOutputStream));
         IFT(pErrorOutputStream.QueryInterface(&pErrorResult));
-        
+
         // Combine existing warnings and errors from validation
         CComPtr<IDxcBlobEncoding> pValError;
         IFT(pValidationResult->GetErrorBuffer(&pValError));

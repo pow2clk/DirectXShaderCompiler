@@ -21,18 +21,19 @@ add_clang_unittest(clang-spirv-tests
   WholeFileTestFixture.cpp
   )
 
-target_compile_definitions(clang-spirv-tests PRIVATE
-  # GoogleTest uses std::tr1, which is deprecated in VS2017.
-  # The following is an escape-hatch macro to silence the deprecation warnings.
-  -D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING)
-
 target_link_libraries(clang-spirv-tests
   clangCodeGen
   clangFrontend
   clangSPIRV
+  dxcompiler
   effcee
   SPIRV-Tools
   )
+
+# This is necessary so that the linked dxcompiler is loaded into memory space
+# first, and in case dxcompiler.so is loaded via 'dlopen', it resolves to the
+# same memory space, and prevents getting two copies of global static variables.
+add_dependencies(clang-spirv-tests dxcompiler)
 
 target_include_directories(clang-spirv-tests
   PRIVATE ${SPIRV_TOOLS_INCLUDE_DIR} ${DXC_EFFCEE_DIR})

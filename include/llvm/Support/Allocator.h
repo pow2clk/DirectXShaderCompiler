@@ -31,6 +31,8 @@
 #include <cstddef>
 #include <cstdlib>
 
+#include "llvm/Support/WinSAL.h"
+
 namespace llvm {
 
 /// \brief CRTP base class providing obvious overloads for the core \c

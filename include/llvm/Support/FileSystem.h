@@ -33,6 +33,7 @@
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TimeValue.h"
+#include "llvm/Support/WinSAL.h"
 #include <ctime>
 #include <iterator>
 #include <stack>
@@ -95,7 +96,6 @@ public:
 
   const std::error_code& error_code() const { return ec; }
 };
-
 // HLSL Change Ends
 
 /// An enumeration for the file system's view of the type.

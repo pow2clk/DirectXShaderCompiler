@@ -49,7 +49,9 @@
 #include "dxc/Support/dxcapi.impl.h"
 #include "dxc/Support/DxcLangExtensionsHelper.h"
 #include "dxc/Support/HLSLOptions.h"
+#ifdef _WIN32
 #include "dxcetw.h"
+#endif
 #include "dxillib.h"
 #include <algorithm>
 
@@ -175,7 +177,7 @@ public:
     return false;
   }
 
-  virtual HLSLExtensionsCodegenHelper::CustomRootSignature::Status GetCustomRootSignature(CustomRootSignature *out) {
+  virtual HLSLExtensionsCodegenHelper::CustomRootSignature::Status GetCustomRootSignature(CustomRootSignature *out) override {
     // Find macro definition in preprocessor.
     Preprocessor &pp = m_CI.getPreprocessor();
     MacroInfo *macro = MacroExpander::FindMacroInfo(pp, m_rootSigDefine);
@@ -253,7 +255,7 @@ public:
     return S_OK;
   }
 
-  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) {
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void **ppvObject) override {
     return DoBasicQueryInterface<IDxcCompiler,
                                  IDxcCompiler2,
                                  IDxcLangExtensions,
@@ -317,8 +319,8 @@ public:
       CComPtr<IDxcBlob> pOutputBlob;
       dxcutil::DxcArgsFileSystem *msfPtr =
         dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
-      std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
 
+      std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
@@ -374,7 +376,7 @@ public:
       llvm::LLVMContext llvmContext; // LLVMContext should outlive CompilerInstance
       CompilerInstance compiler;
       std::unique_ptr<TextDiagnosticPrinter> diagPrinter =
-          std::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());
+          llvm::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());
       SetupCompilerForCompile(compiler, &m_langExtensionsHelper, utf8SourceName, diagPrinter.get(), defines, opts, pArguments, argCount);
       msfPtr->SetupForCompilerInstance(compiler);
 
@@ -474,6 +476,7 @@ public:
           spirvOpts.enableReflect = opts.SpvEnableReflect;
           spirvOpts.defaultRowMajor = opts.DefaultRowMajor;
           spirvOpts.stageIoOrder = opts.VkStageIoOrder;
+          spirvOpts.noWarnIgnoredFeatures = opts.VkNoWarnIgnoredFeatures;
           spirvOpts.bShift = opts.VkBShift;
           spirvOpts.tShift = opts.VkTShift;
           spirvOpts.sShift = opts.VkSShift;
@@ -625,13 +628,11 @@ public:
       CComPtr<AbstractMemoryStream> pOutputStream;
       dxcutil::DxcArgsFileSystem *msfPtr = dxcutil::CreateDxcArgsFileSystem(utf8Source, pSourceName, pIncludeHandler);
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 
       IFT(CreateMemoryStream(m_pMalloc, &pOutputStream));
 
-      const llvm::opt::OptTable *table = ::options::getHlslOptTable();
       int argCountInt;
       IFT(UIntToInt(argCount, &argCountInt));
       hlsl::options::MainArgs mainArgs(argCountInt, pArguments, 0);
@@ -673,7 +674,7 @@ public:
       raw_stream_ostream outStream(pOutputStream.p);
       CompilerInstance compiler;
       std::unique_ptr<TextDiagnosticPrinter> diagPrinter =
-          std::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());
+          llvm::make_unique<TextDiagnosticPrinter>(w, &compiler.getDiagnosticOpts());
       SetupCompilerForCompile(compiler, &m_langExtensionsHelper, utf8SourceName, diagPrinter.get(), defines, opts, pArguments, argCount);
       msfPtr->SetupForCompilerInstance(compiler);
 
@@ -733,7 +734,6 @@ public:
       ::llvm::sys::fs::MSFileSystem *msfPtr;
       IFT(CreateMSFileSystemForDisk(&msfPtr));
       std::unique_ptr<::llvm::sys::fs::MSFileSystem> msf(msfPtr);
-
       ::llvm::sys::fs::AutoPerThreadSystem pts(msf.get());
       IFTLLVM(pts.error_code());
 

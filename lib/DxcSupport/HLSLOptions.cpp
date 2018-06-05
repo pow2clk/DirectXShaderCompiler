@@ -147,6 +147,17 @@ MainArgs::MainArgs(int argc, const wchar_t **argv, int skipArgCount) {
   }
 }
 
+MainArgs::MainArgs(int argc, const char **argv, int skipArgCount) {
+  if (argc > skipArgCount) {
+    Utf8StringVector.reserve(argc - skipArgCount);
+    Utf8CharPtrVector.reserve(argc - skipArgCount);
+    for (int i = skipArgCount; i < argc; ++i) {
+      Utf8StringVector.emplace_back(argv[i]);
+      Utf8CharPtrVector.push_back(Utf8StringVector.back().data());
+    }
+  }
+}
+
 MainArgs::MainArgs(llvm::ArrayRef<llvm::StringRef> args) {
   Utf8StringVector.reserve(args.size());
   Utf8CharPtrVector.reserve(args.size());
@@ -159,6 +170,8 @@ MainArgs::MainArgs(llvm::ArrayRef<llvm::StringRef> args) {
 MainArgs& MainArgs::operator=(const MainArgs &other) {
   Utf8StringVector.clear();
   Utf8CharPtrVector.clear();
+  Utf8StringVector.reserve(other.Utf8StringVector.size());
+  Utf8CharPtrVector.reserve(other.Utf8StringVector.size());
   for (const std::string &str : other.Utf8StringVector) {
     Utf8StringVector.emplace_back(str);
     Utf8CharPtrVector.push_back(Utf8StringVector.back().data());
@@ -487,6 +500,7 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
   opts.VkUseGlLayout = Args.hasFlag(OPT_fvk_use_gl_layout, OPT_INVALID, false);
   opts.VkUseDxLayout = Args.hasFlag(OPT_fvk_use_dx_layout, OPT_INVALID, false);
   opts.SpvEnableReflect = Args.hasFlag(OPT_fspv_reflect, OPT_INVALID, false);
+  opts.VkNoWarnIgnoredFeatures = Args.hasFlag(OPT_Wno_vk_ignored_features, OPT_INVALID, false);
 
   // Collects the arguments for -fvk-{b|s|t|u}-shift.
   const auto handleVkShiftArgs =
@@ -551,6 +565,7 @@ int ReadDxcOpts(const OptTable *optionTable, unsigned flagsToInclude,
       Args.hasFlag(OPT_fvk_use_gl_layout, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fvk_use_dx_layout, OPT_INVALID, false) ||
       Args.hasFlag(OPT_fspv_reflect, OPT_INVALID, false) ||
+      Args.hasFlag(OPT_Wno_vk_ignored_features, OPT_INVALID, false) ||
       !Args.getLastArgValue(OPT_fvk_stage_io_order_EQ).empty() ||
       !Args.getLastArgValue(OPT_fspv_extension_EQ).empty() ||
       !Args.getLastArgValue(OPT_fspv_target_env_EQ).empty() ||

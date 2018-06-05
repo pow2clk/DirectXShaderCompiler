@@ -9,8 +9,6 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
 #include "dxc/Support/WinIncludes.h"
 #include "dxc/HLSL/DxilContainer.h"
 #include "dxc/Support/Global.h"
@@ -169,6 +167,7 @@ HRESULT ValidateAndAssembleToContainer(
     IFT(pValidator->Validate(pOutputBlob, DxcValidatorFlags_InPlaceEdit,
                              &pValResult));
   }
+
   IFT(pValResult->GetStatus(&valHR));
   if (FAILED(valHR)) {
     CComPtr<IDxcBlobEncoding> pErrors;
@@ -213,7 +212,7 @@ void CreateOperationResultFromOutputs(
                                                       status, ppResult));
 }
 
-bool IsAbsoluteOrCurDirRelative(const Twine &T) {
+bool IsAbsoluteOrCurDirRelative(const llvm::Twine &T) {
   if (llvm::sys::path::is_absolute(T)) {
     return true;
   }

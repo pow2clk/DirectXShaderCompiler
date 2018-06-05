@@ -30,6 +30,8 @@
 #include <cstdio>
 #include <tuple>
 
+#include "llvm/Support/WinSAL.h"
+
 namespace llvm {
 
 /// This is a helper class used for handling formatted output.  It is the
