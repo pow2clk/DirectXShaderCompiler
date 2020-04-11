@@ -2138,7 +2138,6 @@ SpirvInstruction *SpirvEmitter::processCall(const CallExpr *callExpr) {
     }
 
     auto *argInst = doExpr(arg);
-    auto argType = arg->getType();
 
     // If argInfo is nullptr and argInst is a rvalue, we do not have a proper
     // pointer to pass to the function. we need a temporary variable in that
