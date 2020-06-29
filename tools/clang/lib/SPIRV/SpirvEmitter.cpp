@@ -11655,7 +11655,6 @@ SpirvEmitter::processRayQueryIntrinsics(const CXXMemberCallExpr *expr,
         cast<ClassTemplateSpecializationDecl>(RT->getDecl());
     ClassTemplateDecl *templateDecl =
         templateSpecDecl->getSpecializedTemplate();
-    const auto retType = exprType;
     exprType = getHLSLMatrixType(astContext, theCompilerInstance.getSema(),
                                  templateDecl, astContext.FloatTy, 4, 3);
   }
