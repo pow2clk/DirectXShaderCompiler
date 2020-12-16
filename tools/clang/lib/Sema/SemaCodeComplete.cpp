@@ -1817,10 +1817,12 @@ static void AddOrdinaryNameResults(Sema::ParserCompletionContext CCC,
   }
 
   // Fall through (for statement expressions).
+  __fallthrough; // HLSL Change
   case Sema::PCC_ForInit:
   case Sema::PCC_Condition:
     AddStorageSpecifiers(CCC, SemaRef.getLangOpts(), Results);
     // Fall through: conditions and statements can have expressions.
+    __fallthrough; // HLSL Change
 
   case Sema::PCC_ParenthesizedExpression:
     if (SemaRef.getLangOpts().ObjCAutoRefCount &&
@@ -3065,6 +3067,7 @@ CXCursorKind clang::getCursorKindForDecl(const Decl *D) {
       case ObjCPropertyImplDecl::Synthesize:
         return CXCursor_ObjCSynthesizeDecl;
       }
+      llvm_unreachable("Unexpected kind!");
 
       case Decl::Import:
         return CXCursor_ModuleImportDecl;

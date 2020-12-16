@@ -1487,7 +1487,6 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
 
     funcProps->shaderKind = DXIL::ShaderKind::Hull;
   }
-
   const ShaderModel *SM = m_pHLModule->GetShaderModel();
   if (auto *Attr = FD->getAttr<HLSLWaveOpsIncludeHelperLanesAttr>()) {
     if (SM->IsSM67Plus() &&
@@ -2183,6 +2182,7 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
             << (funcProps->shaderKind == DXIL::ShaderKind::RayGeneration ?
                 "raygeneration" : "intersection");
         rayShaderHaveErrors = true;
+        break;
       case DXIL::ShaderKind::AnyHit:
       case DXIL::ShaderKind::ClosestHit:
         if (0 == ArgNo && dxilInputQ != DxilParamInputQual::Inout) {
@@ -2299,8 +2299,10 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
     case DXIL::ShaderKind::AnyHit:
     case DXIL::ShaderKind::ClosestHit:
       bNeedsAttributes = true;
+      __fallthrough;
     case DXIL::ShaderKind::Miss:
       bNeedsPayload = true;
+      __fallthrough;
     case DXIL::ShaderKind::Callable:
       if (0 == funcProps->ShaderProps.Ray.payloadSizeInBytes) {
         unsigned DiagID = bNeedsPayload ?

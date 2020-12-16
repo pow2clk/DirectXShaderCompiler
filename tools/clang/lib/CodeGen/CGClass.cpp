@@ -1453,6 +1453,7 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
 #if 1 // HLSL Change - no support for exception handling
     EmitCXXDestructorCall(Dtor, Dtor_Base, /*ForVirtualBase=*/false,
       /*Delegating=*/false, LoadCXXThis());
+    __fallthrough;
 #else
     if (!isTryBody) {
       EmitCXXDestructorCall(Dtor, Dtor_Base, /*ForVirtualBase=*/false,
@@ -1461,7 +1462,6 @@ void CodeGenFunction::EmitDestructorBody(FunctionArgList &Args) {
     }
 #endif // HLSL Change - no support for exception handling
     // Fallthrough: act like we're in the base variant.
-
   case Dtor_Base:
     assert(Body);
 

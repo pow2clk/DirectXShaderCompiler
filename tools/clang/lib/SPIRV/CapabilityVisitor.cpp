@@ -559,8 +559,8 @@ bool CapabilityVisitor::visitInstruction(SpirvInstruction *instr) {
       addCapability(spv::Capability::RayTracingKHR);
       addExtension(Extension::KHR_ray_tracing, "SPV_KHR_ray_tracing", {});
     }
+    break;
   }
-
   case spv::Op::OpSetMeshOutputsEXT:
   case spv::Op::OpEmitMeshTasksEXT: {
     if (featureManager.isExtensionEnabled(Extension::EXT_mesh_shader)) {

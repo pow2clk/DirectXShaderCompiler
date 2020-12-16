@@ -3506,6 +3506,7 @@ bool Type::canHaveNullability() const {
     case BuiltinType::NullPtr:
       return false;
     }
+    llvm_unreachable("unknown builtin!");
 
   // Non-pointer types.
   case Type::Complex:
