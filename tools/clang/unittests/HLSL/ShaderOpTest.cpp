@@ -431,22 +431,21 @@ void ShaderOpTest::CreatePipelineState() {
 
     struct D3DX12_MESH_SHADER_PIPELINE_STATE_DESC
     {
-      ID3D12RootSignature*          pRootSignature;
-      D3D12_SHADER_BYTECODE         AS;
-      D3D12_SHADER_BYTECODE         MS;
-      D3D12_SHADER_BYTECODE         PS;
-      D3D12_BLEND_DESC              BlendState;
-      UINT                          SampleMask;
-      D3D12_RASTERIZER_DESC         RasterizerState;
-      D3D12_DEPTH_STENCIL_DESC      DepthStencilState;
-      D3D12_PRIMITIVE_TOPOLOGY_TYPE PrimitiveTopologyType;
-      UINT                          NumRenderTargets;
-      DXGI_FORMAT                   RTVFormats[ D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT ];
-      DXGI_FORMAT                   DSVFormat;
-      DXGI_SAMPLE_DESC              SampleDesc;
-      UINT                          NodeMask;
-      D3D12_CACHED_PIPELINE_STATE   CachedPSO;
-      D3D12_PIPELINE_STATE_FLAGS    Flags;
+      CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE RootSignature;
+      CD3DX12_PIPELINE_STATE_STREAM_AS    AS;
+      CD3DX12_PIPELINE_STATE_STREAM_MS    MS;
+      CD3DX12_PIPELINE_STATE_STREAM_PS    PS;
+      CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+      CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_MASK SampleMask;
+
+      CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
+
+#if 0
+      CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_DESC SampleDesc;
+      CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER RasterizerState;
+      CD3DX12_PIPELINE_STATE_STREAM_BLEND_DESC BlendState;
+#endif
+
     } MDesc = {};
 
     CComPtr<ID3D10Blob> pAS, pMS, pPS;
@@ -455,20 +454,29 @@ void ShaderOpTest::CreatePipelineState() {
     pPS = map_get_or_null(m_Shaders, m_pShaderOp->PS);
 
     ZeroMemory(&MDesc, sizeof(MDesc));
-    MDesc.pRootSignature = m_pRootSignature.p;
-    InitByteCode(&MDesc.AS, pAS);
-    InitByteCode(&MDesc.MS, pMS);
-    InitByteCode(&MDesc.PS, pPS);
-    MDesc.PrimitiveTopologyType = m_pShaderOp->PrimitiveTopologyType;
-    MDesc.NumRenderTargets = (UINT)m_pShaderOp->RenderTargets.size();
-    MDesc.SampleMask = m_pShaderOp->SampleMask;
-    for (size_t i = 0; i < m_pShaderOp->RenderTargets.size(); ++i) {
+    MDesc.RootSignature = CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE(m_pRootSignature.p);
+    D3D12_SHADER_BYTECODE BC;
+    InitByteCode(&BC, pAS);
+    MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_AS(BC);
+    InitByteCode(&BC, pMS);
+    MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_MS(BC);
+    InitByteCode(&BC, pPS);
+    MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_PS(BC);
+    MDesc.PrimitiveTopologyType = CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(m_pShaderOp->PrimitiveTopologyType);
+    MDesc.SampleMask = CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_MASK(m_pShaderOp->SampleMask);
+
+    D3D12_RT_FORMAT_ARRAY RtArray;
+    RtArray.NumRenderTargets = (UINT)m_pShaderOp->RenderTargets.size();
+    for (size_t i = 0; i < RtArray.NumRenderTargets; ++i) {
       ShaderOpResource *R = m_pShaderOp->GetResourceByName(m_pShaderOp->RenderTargets[i]);
-      MDesc.RTVFormats[i] = R->Desc.Format;
+      RtArray.RTFormats[i] = R->Desc.Format;
     }
+    MDesc.RTVFormats = CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS(RtArray);
+#if 0
     MDesc.SampleDesc.Count = 1; // TODO: read from file, set from shader operation; also apply to count
     MDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // TODO: read from file, set from op
     MDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT); // TODO: read from file, set from op
+#endif
 
     D3D12_PIPELINE_STATE_STREAM_DESC PDesc = {};
     PDesc.SizeInBytes = sizeof(MDesc);
