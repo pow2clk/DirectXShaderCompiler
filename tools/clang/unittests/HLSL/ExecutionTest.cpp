@@ -1137,36 +1137,36 @@ public:
   }
 
   bool DoesDeviceSupportMeshAmpDerivatives(ID3D12Device *pDevice) {
-#if 0
+#if 1
     D3D12_FEATURE_DATA_D3D12_OPTIONS7 O7;
-    D3D12_FEATURE_DATA_D3D12_OPTIONS8 O8;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS9 O9;
     if (FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS7, &O7, sizeof(O7))) ||
-        FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS8, &O8, sizeof(O8))))
+        FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS9, &O9, sizeof(O9))))
       return false;
     return O7.MeshShaderTier != D3D12_MESH_SHADER_TIER_NOT_SUPPORTED &&
-      O8.DerivativesInMeshAndAmplificationShadersSupported != FALSE;
+      O9.DerivativesInMeshAndAmplificationShadersSupported != FALSE;
 #else
     return false;
 #endif
   }
 
   bool DoesDeviceSupportTyped64Atomics(ID3D12Device *pDevice) {
-#if 0
-    D3D12_FEATURE_DATA_D3D12_OPTIONS8 O8;
-    if (FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS8, &O8, sizeof(O8))))
+#if 1
+    D3D12_FEATURE_DATA_D3D12_OPTIONS9 O9;
+    if (FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS9, &O9, sizeof(O9))))
       return false;
-    return O8.AtomicInt64OnTypedResourceSupported != FALSE;
+    return O9.AtomicInt64OnTypedResourceSupported != FALSE;
 #else
     return false;
 #endif
   }
 
   bool DoesDeviceSupportShared64Atomics(ID3D12Device *pDevice) {
-#if 0
-    D3D12_FEATURE_DATA_D3D12_OPTIONS8 O8;
-    if (FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS8, &O8, sizeof(O8))))
+#if 1
+    D3D12_FEATURE_DATA_D3D12_OPTIONS9 O9;
+    if (FAILED(pDevice->CheckFeatureSupport((D3D12_FEATURE)D3D12_FEATURE_D3D12_OPTIONS9, &O9, sizeof(O9))))
       return false;
-    return O8.AtomicInt64OnGroupSharedSupported != FALSE;
+    return O9.AtomicInt64OnGroupSharedSupported != FALSE;
 #else
     return false;
 #endif
