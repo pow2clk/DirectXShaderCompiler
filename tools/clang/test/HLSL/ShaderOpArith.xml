@@ -219,10 +219,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             g_bufMesh[ix] = DerivTest(ix);
         }
         float4 PSMain(PSInput input) : SV_TARGET {
@@ -322,9 +321,8 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             g_bufMesh[ix] = QuadReadTest(ix);
         }
 
@@ -473,10 +471,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             g_bufMesh[ix] = DerivTest(ix);
         }
 
@@ -1764,7 +1761,7 @@
           { 1.0f, 0.0f },
           { 1.0f, 1.0f }};
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         void ASMain(uint ix : SV_GroupIndex) {
           Payload payload;
           payload.nothing = 0;
@@ -1773,7 +1770,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         [OutputTopology("triangle")]
         void MSMain(
           uint ix : SV_GroupIndex,
@@ -1781,10 +1778,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicTest(64*64 + ix, 32);
             AtomicGroupSharedTest(64*64 + ix, 32);
         }
@@ -1809,7 +1805,7 @@
           AtomicGroupSharedTest(ix, 32);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         void ASMain64(uint ix : SV_GroupIndex) {
           Payload payload;
           payload.nothing = 0;
@@ -1817,7 +1813,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         [OutputTopology("triangle")]
         void MSMain64(
           uint ix : SV_GroupIndex,
@@ -1825,10 +1821,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicRaw64Test(64*64 + ix, 64);
         }
 
@@ -1851,7 +1846,7 @@
           AtomicRaw64Test(ix, 64);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         void ASMainTyped64(uint ix : SV_GroupIndex) {
           Payload payload;
           payload.nothing = 0;
@@ -1859,7 +1854,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         [OutputTopology("triangle")]
         void MSMainTyped64(
           uint ix : SV_GroupIndex,
@@ -1867,10 +1862,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicTyped64Test(64*64 + ix, 64);
         }
 
@@ -1893,7 +1887,7 @@
           AtomicTyped64Test(ix, 64);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         void ASMainShared64(uint ix : SV_GroupIndex) {
           Payload payload;
           payload.nothing = 0;
@@ -1901,7 +1895,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         [OutputTopology("triangle")]
         void MSMainShared64(
           uint ix : SV_GroupIndex,
@@ -1909,10 +1903,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicGroupShared64Test(64*64 + ix, 64);
         }
 
@@ -2088,7 +2081,7 @@
           { 1.0f, 0.0f },
           { 1.0f, 1.0f }};
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         void ASMain(uint ix : SV_GroupIndex) {
           Payload payload;
           payload.nothing = 0;
@@ -2097,7 +2090,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 2)]
+        [NumThreads(8, 8, 1)]
         [OutputTopology("triangle")]
         void MSMain(
           uint ix : SV_GroupIndex,
@@ -2105,10 +2098,9 @@
           out vertices PSInput verts[6],
           out indices uint3 tris[2]) {
             SetMeshOutputCounts(6, 2);
-            verts[ix].position = g_Verts[ix];
-            verts[ix].uv = g_UV[ix];
-            if (ix % 3)
-              tris[ix / 3] = uint3(ix, ix + 1, ix + 2);
+            verts[ix%6].position = g_Verts[ix%6];
+            verts[ix%6].uv = g_UV[ix%6];
+            tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicTest(ix);
             AtomicGroupSharedTest(ix);
         }

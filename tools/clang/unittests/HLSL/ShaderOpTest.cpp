@@ -459,13 +459,14 @@ void ShaderOpTest::CreatePipelineState() {
     InitByteCode(&BC, pAS);
     MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_AS(BC);
     InitByteCode(&BC, pMS);
-    MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_MS(BC);
+    MDesc.MS = CD3DX12_PIPELINE_STATE_STREAM_MS(BC);
     InitByteCode(&BC, pPS);
-    MDesc.AS = CD3DX12_PIPELINE_STATE_STREAM_PS(BC);
+    MDesc.PS = CD3DX12_PIPELINE_STATE_STREAM_PS(BC);
     MDesc.PrimitiveTopologyType = CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY(m_pShaderOp->PrimitiveTopologyType);
     MDesc.SampleMask = CD3DX12_PIPELINE_STATE_STREAM_SAMPLE_MASK(m_pShaderOp->SampleMask);
 
     D3D12_RT_FORMAT_ARRAY RtArray;
+    ZeroMemory(&RtArray, sizeof(RtArray));
     RtArray.NumRenderTargets = (UINT)m_pShaderOp->RenderTargets.size();
     for (size_t i = 0; i < RtArray.NumRenderTargets; ++i) {
       ShaderOpResource *R = m_pShaderOp->GetResourceByName(m_pShaderOp->RenderTargets[i]);
@@ -901,38 +902,50 @@ void ShaderOpTest::RunCommandList() {
     const float ClearColor[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
     pList->ClearRenderTargetView(rtvHandles[0], ClearColor, 0, nullptr);
 
-    // TODO: set all of this from m_pShaderOp.
-    ShaderOpResourceData &VBufferData = this->m_ResourceData[m_pShaderOp->Strings.insert("VBuffer")];
+#if defined(NTDDI_WIN10_VB) && WDK_NTDDI_VERSION >= NTDDI_WIN10_VB
+    if (m_pShaderOp->MS) {
+      ID3D12GraphicsCommandList6 *pList6 = m_CommandList.List.p;
+      pList6->BeginQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
+      pList6->DispatchMesh(1, 1, 1);
+      pList6->EndQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
+      pList6->ResolveQueryData(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS,
+                              0, 1, m_pQueryBuffer, 0);
+    } else
+#endif
+    {
+      // TODO: set all of this from m_pShaderOp.
+      ShaderOpResourceData &VBufferData = this->m_ResourceData[m_pShaderOp->Strings.insert("VBuffer")];
 
-    D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
-    for (ShaderOpResource &resource : m_pShaderOp->Resources) {
+      D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+      for (ShaderOpResource &resource : m_pShaderOp->Resources) {
         if (_strcmpi(resource.Name, "VBuffer") == 0) {
-            topology = resource.PrimitiveTopology;
-            break;
+          topology = resource.PrimitiveTopology;
+          break;
         }
+      }
+      pList->IASetPrimitiveTopology(topology);
+
+      // Calculate the stride in bytes from the inputs, assuming linear & contiguous.
+      UINT strideInBytes = 0;
+      for (auto && IE : m_pShaderOp->InputElements) {
+        strideInBytes += GetByteSizeForFormat(IE.Format);
+      }
+
+      D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
+      vertexBufferView.BufferLocation = VBufferData.Resource->GetGPUVirtualAddress();
+      vertexBufferView.StrideInBytes = strideInBytes;
+      vertexBufferView.SizeInBytes = (UINT)VBufferData.ShaderOpRes->Desc.Width;
+      pList->IASetVertexBuffers(0, 1, &vertexBufferView);
+      UINT vertexCount = vertexBufferView.SizeInBytes / vertexBufferView.StrideInBytes;
+      UINT instanceCount = 1;
+      UINT vertexCountPerInstance = vertexCount / instanceCount;
+
+      pList->BeginQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
+      pList->DrawInstanced(vertexCountPerInstance, instanceCount, 0, 0);
+      pList->EndQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
+      pList->ResolveQueryData(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS,
+                              0, 1, m_pQueryBuffer, 0);
     }
-    pList->IASetPrimitiveTopology(topology);
-
-    // Calculate the stride in bytes from the inputs, assuming linear & contiguous.
-    UINT strideInBytes = 0;
-    for (auto && IE : m_pShaderOp->InputElements) {
-      strideInBytes += GetByteSizeForFormat(IE.Format);
-    }
-
-    D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-    vertexBufferView.BufferLocation = VBufferData.Resource->GetGPUVirtualAddress();
-    vertexBufferView.StrideInBytes = strideInBytes;
-    vertexBufferView.SizeInBytes = (UINT)VBufferData.ShaderOpRes->Desc.Width;
-    pList->IASetVertexBuffers(0, 1, &vertexBufferView);
-    UINT vertexCount = vertexBufferView.SizeInBytes / vertexBufferView.StrideInBytes;
-    UINT instanceCount = 1;
-    UINT vertexCountPerInstance = vertexCount / instanceCount;
-
-    pList->BeginQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
-    pList->DrawInstanced(vertexCountPerInstance, instanceCount, 0, 0);
-    pList->EndQuery(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS, 0);
-    pList->ResolveQueryData(m_pQueryHeap, D3D12_QUERY_TYPE_PIPELINE_STATISTICS,
-                            0, 1, m_pQueryBuffer, 0);
   }
   CHECK_HR(pList->Close());
   ExecuteCommandList(m_CommandList.Queue, pList);

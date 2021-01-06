@@ -8551,7 +8551,7 @@ TEST_F(ExecutionTest, AtomicsTest) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying 32-bit integer atomic operations in amp/mesh/pixel shaders");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "Atomics", nullptr, ShaderOpSet);
-    VerifyAtomicsTest(test, 8*8*8*8 + 64*64, 32, false /* hasGroupShared */);
+    VerifyAtomicsTest(test, 8*8 + 8*8 + 64*64, 32, false /* hasGroupShared */);
   }
 
   // Test Vertex + Pixel shader
