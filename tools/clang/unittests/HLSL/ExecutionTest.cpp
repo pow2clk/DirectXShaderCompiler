@@ -8603,7 +8603,7 @@ TEST_F(ExecutionTest, Atomics64Test) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying 64-bit integer atomic operations on raw buffers in amp/mesh/pixel shader");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "Atomics", nullptr, ShaderOpSet);
-    VerifyAtomicsRawTest(test, 8*8*8*8 + 64*64, 64);
+    VerifyAtomicsRawTest(test, 8*8 + 8*8 + 64*64, 64);
   }
 
   // Test Vertex + Pixel shader
@@ -8667,7 +8667,7 @@ TEST_F(ExecutionTest, AtomicsTyped64Test) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying 64-bit integer atomic operations on typed resources in amp/mesh/pixel shader");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "Atomics", nullptr, ShaderOpSet);
-    VerifyAtomicsTypedTest(test, 8*8*8*8 + 64*64, 64);
+    VerifyAtomicsTypedTest(test, 8*8 + 8*8 + 64*64, 64);
   }
 
   // Test Vertex + Pixel shader
@@ -8729,7 +8729,7 @@ TEST_F(ExecutionTest, AtomicsShared64Test) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying 64-bit integer atomic operations on groupshared variables in amp/mesh/pixel shader");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "Atomics", nullptr, ShaderOpSet);
-    VerifyAtomicsSharedTest(test, 8*8*8*8 + 64*64, 64);
+    VerifyAtomicsSharedTest(test, 8*8 + 8*8 + 64*64, 64);
   }
 }
 
@@ -8829,7 +8829,7 @@ TEST_F(ExecutionTest, AtomicsFloatTest) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying float cmp/xchg atomic operations in amp/mesh/pixel shaders");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "FloatAtomics", nullptr, ShaderOpSet);
-    VerifyAtomicsFloatTest(test, 8*8*8*8 + 64*64, false /* hasGroupShared */);
+    VerifyAtomicsFloatTest(test, 8*8 + 8*8 + 64*64, false /* hasGroupShared */);
   }
 
   // Test Vertex + Pixel shader
