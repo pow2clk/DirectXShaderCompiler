@@ -1768,7 +1768,7 @@
 
           payload.arith[ix%6] = g_uintShare[ix%6];
           payload.arith[ix%3 + 6] = g_sintShare[ix%3 + 1];
-          payload.xchg[(ix/3)%64] = g_xchgShare[(ix/3)%64];
+          payload.xchg[ix%64] = g_xchgShare[ix%64];
 
           DispatchMesh(1, 1, 1, payload);
         }
@@ -1798,7 +1798,7 @@
             g_shareBuf[ix%6].x = g_uintShare[ix%6];
             g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
 
-            g_shareXchgBuf[(ix/3)%64].x = g_xchgShare[(ix/3)%64];
+            g_shareXchgBuf[ix%64].x = g_xchgShare[ix%64];
         }
 
         PSInput VSMain(float3 position : POSITION, float2 uv : TEXCOORD, uint ix : SV_VertexID) {
@@ -1824,7 +1824,7 @@
           g_shareBuf[ix%6].x = g_uintShare[ix%6];
           g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
 
-          g_shareXchgBuf[(ix/3)%64].x = g_xchgShare[(ix/3)%64];
+          g_shareXchgBuf[ix%64].x = g_xchgShare[ix%64];
         }
 
         [NumThreads(8, 8, 2)]
@@ -1914,7 +1914,7 @@
 
           payload64.arith[ix%6] = g_uint64Share[ix%6];
           payload64.arith[ix%3 + 6] = g_sint64Share[ix%3 + 1];
-          payload64.xchg[(ix/3)%64] = g_xchg64Share[(ix/3)%64];
+          payload64.xchg[ix%64] = g_xchg64Share[ix%64];
 
           DispatchMesh(1, 1, 1, payload64);
         }
@@ -1942,7 +1942,7 @@
             g_share64Buf[ix%6] = g_uint64Share[ix%6];
             g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
 
-            g_shareXchg64Buf[(ix/3)%64] = g_xchg64Share[(ix/3)%64];
+            g_shareXchg64Buf[ix%64] = g_xchg64Share[ix%64];
 
         }
 
@@ -1954,7 +1954,7 @@
           g_share64Buf[ix%6] = g_uint64Share[ix%6];
           g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
 
-          g_shareXchg64Buf[(ix/3)%64] = g_xchg64Share[(ix/3)%64];
+          g_shareXchg64Buf[ix%64] = g_xchg64Share[ix%64];
 
         }
       ]]>
