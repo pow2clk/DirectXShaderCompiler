@@ -1759,9 +1759,9 @@
 
         groupshared Payload payload;
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         void ASMain(uint ix : SV_GroupIndex) {
-          AtomicTest(64*64 + 8*8 + ix, 32);
+          AtomicTest(64*64 + 8*8*2 + ix, 32);
 
           InitSharedMem(ix);
           AtomicGroupSharedTest(ix);
@@ -1773,7 +1773,7 @@
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         [OutputTopology("triangle")]
         void MSMain(
           uint ix : SV_GroupIndex,
@@ -1793,7 +1793,7 @@
 
             GroupMemoryBarrierWithGroupSync();
 
-            AtomicGroupSharedTest(8*8 + ix);
+            AtomicGroupSharedTest(8*8*2 + ix);
 
             g_shareBuf[ix%6].x = g_uintShare[ix%6];
             g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
@@ -1827,13 +1827,13 @@
           g_shareXchgBuf[(ix/3)%64].x = g_xchgShare[(ix/3)%64];
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         void ASMain64(uint ix : SV_GroupIndex) {
-          AtomicRaw64Test(64*64 + 8*8 + ix, 64);
+          AtomicRaw64Test(64*64 + 8*8*2 + ix, 64);
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         [OutputTopology("triangle")]
         void MSMain64(
           uint ix : SV_GroupIndex,
@@ -1866,13 +1866,13 @@
           AtomicRaw64Test(ix, 64);
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         void ASMainTyped64(uint ix : SV_GroupIndex) {
-          AtomicTyped64Test(64*64 + 8*8 + ix, 64);
+          AtomicTyped64Test(64*64 + 8*8*2 + ix, 64);
           DispatchMesh(1, 1, 1, payload);
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         [OutputTopology("triangle")]
         void MSMainTyped64(
           uint ix : SV_GroupIndex,
@@ -1907,7 +1907,7 @@
 
         groupshared Payload64 payload64;
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         void ASMainShared64(uint ix : SV_GroupIndex) {
           InitSharedMem64(ix);
           AtomicGroupShared64Test(ix);
@@ -1919,7 +1919,7 @@
           DispatchMesh(1, 1, 1, payload64);
         }
 
-        [NumThreads(8, 8, 1)]
+        [NumThreads(8, 8, 2)]
         [OutputTopology("triangle")]
         void MSMainShared64(
           uint ix : SV_GroupIndex,
@@ -1937,7 +1937,7 @@
 
             GroupMemoryBarrierWithGroupSync();
 
-            AtomicGroupShared64Test(8*8 + ix);
+            AtomicGroupShared64Test(8*8*2 + ix);
 
             g_share64Buf[ix%6] = g_uint64Share[ix%6];
             g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
