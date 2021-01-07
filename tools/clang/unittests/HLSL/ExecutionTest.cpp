@@ -8729,7 +8729,7 @@ TEST_F(ExecutionTest, AtomicsShared64Test) {
   if (DoesDeviceSupportMeshShaders(pDevice)) {
     LogCommentFmt(L"Verifying 64-bit integer atomic operations on groupshared variables in amp/mesh/pixel shader");
     test = RunShaderOpTestAfterParse(pDevice, m_support, "Atomics", nullptr, ShaderOpSet);
-    VerifyAtomicsSharedTest(test, 8*8 + 8*8 + 64*64, 64);
+    VerifyAtomicsSharedTest(test, 8*8 + 8*8, 64);
   }
 }
 
