@@ -1762,13 +1762,13 @@
         [NumThreads(8, 8, 1)]
         void ASMain(uint ix : SV_GroupIndex) {
           AtomicTest(64*64 + 8*8 + ix, 32);
+
           InitSharedMem(ix);
-          AtomicGroupSharedTest(64*64 + 8*8 + ix);
+          AtomicGroupSharedTest(ix);
 
-          g_shareBuf[ix%6].x = g_uintShare[ix%6];
-          g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
-
-          g_shareXchgBuf[(ix/3)%64].x = g_xchgShare[(ix/3)%64];
+          payload.arith[ix%6] = g_uintShare[ix%6];
+          payload.arith[ix%3 + 6] = g_sintShare[ix%3 + 1];
+          payload.xchg[(ix/3)%64] = g_xchgShare[(ix/3)%64];
 
           DispatchMesh(1, 1, 1, payload);
         }
@@ -1784,9 +1784,16 @@
             verts[ix%6].position = g_Verts[ix%6];
             verts[ix%6].uv = g_UV[ix%6];
             tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
+
             AtomicTest(64*64 + ix, 32);
-            InitSharedMem(ix);
-            AtomicGroupSharedTest(ix);
+
+            g_uint64Share[ix%6] = payload.arith[ix%6];
+            g_sint64Share[ix%3] = payload.arith[ix%3 + 6];
+            g_xchg64Share[ix%64] = payload.xchg[ix%64];
+
+            GroupMemoryBarrierWithGroupSync();
+
+            AtomicGroupSharedTest(8*8 + ix);
 
             g_shareBuf[ix%6].x = g_uintShare[ix%6];
             g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
@@ -1903,7 +1910,7 @@
         [NumThreads(8, 8, 1)]
         void ASMainShared64(uint ix : SV_GroupIndex) {
           InitSharedMem64(ix);
-          AtomicGroupShared64Test(8*8 + ix);
+          AtomicGroupShared64Test(ix);
 
           payload64.arith[ix%6] = g_uint64Share[ix%6];
           payload64.arith[ix%3 + 6] = g_sint64Share[ix%3 + 1];
@@ -1930,7 +1937,7 @@
 
             GroupMemoryBarrierWithGroupSync();
 
-            AtomicGroupShared64Test(ix);
+            AtomicGroupShared64Test(8*8 + ix);
 
             g_share64Buf[ix%6] = g_uint64Share[ix%6];
             g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
