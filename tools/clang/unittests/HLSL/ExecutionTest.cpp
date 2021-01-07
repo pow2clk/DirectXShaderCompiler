@@ -8297,7 +8297,7 @@ void VerifyAtomicResults(const BYTE *uResults, const BYTE *sResults,
   LogCommentFmt(L"Verifying %d-bit integer atomic add", bitSize);
   // For 32-bit values, the sum exceeds the 16 bit limit, so we can't duplicate
   // That's fine, the duplication is really for 64-bit values.
-  if (addResult >= 1ULL << shBits)
+  if (bitSize < 64)
     VERIFY_IS_TRUE(AtomicResultMatches(uResults + stride*ADD_IDX, addResult, byteSize));
   else
     VERIFY_IS_TRUE(AtomicResultMatches(uResults + stride*ADD_IDX, SHIFT(addResult, shBits), byteSize));

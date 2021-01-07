@@ -1787,9 +1787,9 @@
 
             AtomicTest(64*64 + ix, 32);
 
-            g_uint64Share[ix%6] = payload.arith[ix%6];
-            g_sint64Share[ix%3] = payload.arith[ix%3 + 6];
-            g_xchg64Share[ix%64] = payload.xchg[ix%64];
+            g_uintShare[ix%6] = payload.arith[ix%6];
+            g_sintShare[ix%3] = payload.arith[ix%3 + 6];
+            g_xchgShare[ix%64] = payload.xchg[ix%64];
 
             GroupMemoryBarrierWithGroupSync();
 
