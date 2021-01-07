@@ -1667,26 +1667,36 @@
           XCHG_TEST(VEC_CALL3, VEC_CALL4, g_xtex64Buf)
         }
 
-        void ZeroSharedMem(uint ix) {
+        void InitSharedMem(uint ix) {
           // Zero-init shared memory
           g_uintShare[ix%6] = 0;
           g_sintShare[ix%3] = 0;
           g_xchgShare[ix%64] = 0;
 
           GroupMemoryBarrierWithGroupSync();
+
+          InterlockedCompareStore(g_uintShare[1], 0, 99999999);
+          InterlockedCompareStore(g_uintShare[3], 0, -1);
+          InterlockedCompareStore(g_sintShare[1], 0, 99999999);
         }
 
-        void ZeroSharedMem64(uint ix) {
+        void InitSharedMem64(uint ix) {
           // Zero-init shared memory
           g_uint64Share[ix%6] = 0;
           g_sint64Share[ix%3] = 0;
           g_xchg64Share[ix%64] = 0;
 
           GroupMemoryBarrierWithGroupSync();
+
+          InterlockedCompareStore(g_uint64Share[1], 0, 99999999ULL | (99999999ULL << 32));
+          InterlockedCompareStore(g_uint64Share[3], 0, ~0ULL);
+          InterlockedCompareStore(g_sint64Share[1], 0, 99999999ULL | (99999999ULL << 32));
+
         }
 
-        void AtomicGroupSharedTest(uint ix, uint bitSize) {
+        void AtomicGroupSharedTest(uint ix) {
           uint stride = 1;
+          uint bitSize = 32;
           uint value = (ix) | ((ix) << (bitSize/2));
           uint addVal = ix; // 32 bits isn't enough room to dupliate upper and lower
           uint uminMaxVal = ~value*(~value&1) + value*(value&1);
@@ -1695,19 +1705,16 @@
           uint xchgVal = (ix << (bitSize/2)) | ((ix/3)%64);
           uint output = 0;
 
-          InterlockedCompareStore(g_uintShare[stride], 0, 99999999);
-          InterlockedCompareStore(g_uintShare[3*stride], 0, -1);
-          InterlockedCompareStore(g_sintShare[stride], 0, 99999999);
-
           OP_TEST(VEC_CALL, VEC_CALL, g_uintShare, g_sintShare)
           XCHG_TEST(VEC_CALL3, VEC_CALL4, g_xchgShare)
 
           GroupMemoryBarrierWithGroupSync();
         }
 
-        void AtomicGroupShared64Test(uint ix, uint64_t bitSize) {
+        void AtomicGroupShared64Test(uint ix) {
           uint64_t lix = ix;
           uint stride = 1;
+          uint64_t bitSize = 64;
           uint64_t value = (lix) | ((lix) << (bitSize/2));
           uint64_t addVal = value;
           uint64_t uminMaxVal = ~value*(~value&1) + value*(value&1);
@@ -1715,18 +1722,6 @@
           uint64_t xorVal = 1ULL << (lix%(bitSize-1));
           uint64_t xchgVal = (lix << (bitSize/2)) | ((lix/3)%64);
           uint64_t output = 0;
-
-          ZeroSharedMem64(ix);
-          // Zero-init shared memory
-          g_uint64Share[ix%6] = 0;
-          g_sint64Share[ix%3] = 0;
-          g_xchg64Share[ix%64] = 0;
-
-          GroupMemoryBarrierWithGroupSync();
-
-          InterlockedCompareStore(g_uint64Share[stride], 0, 99999999ULL | (99999999ULL << (bitSize/2)));
-          InterlockedCompareStore(g_uint64Share[3*stride], 0, ~0ULL);
-          InterlockedCompareStore(g_sint64Share[stride], 0, 99999999ULL | (99999999ULL << (bitSize/2)));
 
           OP_TEST(VEC_CALL, VEC_CALL, g_uint64Share, g_sint64Share)
           XCHG_TEST(VEC_CALL3, VEC_CALL4, g_xchg64Share)
@@ -1767,8 +1762,8 @@
         [NumThreads(8, 8, 1)]
         void ASMain(uint ix : SV_GroupIndex) {
           AtomicTest(64*64 + 8*8 + ix, 32);
-          ZeroSharedMem(ix);
-          AtomicGroupSharedTest(64*64 + 8*8 + ix, 32);
+          InitSharedMem(ix);
+          AtomicGroupSharedTest(64*64 + 8*8 + ix);
 
           g_shareBuf[ix%6].x = g_uintShare[ix%6];
           g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
@@ -1790,8 +1785,8 @@
             verts[ix%6].uv = g_UV[ix%6];
             tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
             AtomicTest(64*64 + ix, 32);
-            ZeroSharedMem(ix);
-            AtomicGroupSharedTest(ix, 32);
+            InitSharedMem(ix);
+            AtomicGroupSharedTest(ix);
 
             g_shareBuf[ix%6].x = g_uintShare[ix%6];
             g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
@@ -1816,8 +1811,8 @@
         [NumThreads(32, 32, 1)]
         void CSMain(uint ix : SV_GroupIndex) {
           AtomicTest(ix, 32);
-          ZeroSharedMem(ix);
-          AtomicGroupSharedTest(ix, 32);
+          InitSharedMem(ix);
+          AtomicGroupSharedTest(ix);
 
           g_shareBuf[ix%6].x = g_uintShare[ix%6];
           g_shareBuf[ix%3 + 6].x = g_sintShare[ix%3 + 1];
@@ -1907,8 +1902,8 @@
 
         [NumThreads(8, 8, 1)]
         void ASMainShared64(uint ix : SV_GroupIndex) {
-          ZeroSharedMem64(ix);
-          AtomicGroupShared64Test(8*8 + ix, 64);
+          InitSharedMem64(ix);
+          AtomicGroupShared64Test(8*8 + ix);
 
           payload64.arith[ix%6] = g_uint64Share[ix%6];
           payload64.arith[ix%3 + 6] = g_sint64Share[ix%3 + 1];
@@ -1928,8 +1923,14 @@
             verts[ix%6].position = g_Verts[ix%6];
             verts[ix%6].uv = g_UV[ix%6];
             tris[ix&1] = uint3((ix&1)*3, (ix&1)*3 + 1, (ix&1)*3 + 2);
-            ZeroSharedMem64(ix);
-            AtomicGroupShared64Test(ix, 64);
+
+            g_uint64Share[ix%6] = payload.arith[ix%6];
+            g_sint64Share[ix%3] = payload.arith[ix%3 + 6];
+            g_xchg64Share[ix%64] = payload.xchg[ix%64];
+
+            GroupMemoryBarrierWithGroupSync();
+
+            AtomicGroupShared64Test(ix);
 
             g_share64Buf[ix%6] = g_uint64Share[ix%6];
             g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
@@ -1940,8 +1941,8 @@
 
         [NumThreads(32, 32, 1)]
         void CSMainShared64(uint ix : SV_GroupIndex) {
-          ZeroSharedMem64(ix);
-          AtomicGroupShared64Test(ix, 64);
+          InitSharedMem64(ix);
+          AtomicGroupShared64Test(ix);
 
           g_share64Buf[ix%6] = g_uint64Share[ix%6];
           g_share64Buf[ix%3 + 6] = g_sint64Share[ix%3 + 1];
