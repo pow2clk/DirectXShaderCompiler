@@ -98,7 +98,15 @@ public:
     _In_ LPCWSTR pFilename,                   // Filename as written in #include statement
     _COM_Outptr_ IDxcBlob **ppIncludeSource   // Resultant source object for included file
     ) override {
-    CallInfos.push_back(LoadSourceCallInfo(pFilename));
+
+    LoadSourceCallInfo callInfo = LoadSourceCallInfo(pFilename);
+    size_t nameLen = callInfo.Filename.length();
+
+    if (callInfo.Filename[nameLen-1] != L'h' ||
+        callInfo.Filename[nameLen-2] != L'.')
+      return m_defaultErrorCode;
+
+    CallInfos.push_back(callInfo);
 
     *ppIncludeSource = nullptr;
     if (callIndex >= CallResults.size()) {
@@ -2172,7 +2180,7 @@ TEST_F(CompilerTest, CompileWhenIncludeHasPathThenOK) {
     CComPtr<TestIncludeHandler> pInclude;
     pInclude = new TestIncludeHandler(m_dllSupport);
     pInclude->CallResults.emplace_back("// Empty");
-    CreateBlobFromText("#include \"include.hlsl\"\r\n"
+    CreateBlobFromText("#include \"include.h\"\r\n"
                        "float4 main() : SV_Target { return 0; }",
                        &pSource);
 #endif
@@ -2466,7 +2474,12 @@ public:
 
 #if _ITERATOR_DEBUG_LEVEL==0
 // CompileWhenNoMemThenOOM can properly detect leaks only when debug iterators are disabled
+#ifdef _WIN32
 TEST_F(CompilerTest, CompileWhenNoMemThenOOM) {
+#else
+// Disabled it is ignored above
+TEST_F(CompilerTest, DISABLED_CompileWhenNoMemThenOOM) {
+#endif
   WEX::TestExecution::SetVerifyOutput verifySettings(WEX::TestExecution::VerifyOutputSettings::LogOnlyFailures);
 
   CComPtr<IDxcBlobEncoding> pSource;
@@ -2898,6 +2911,7 @@ TEST_F(CompilerTest, CodeGenVectorAtan2) {
   CodeGenTestCheck(L"atan2_vector_argument.hlsl");
 }
 
+#ifdef _WIN32 // Reflection unsupported
 TEST_F(CompilerTest, LibGVStore) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
@@ -2973,6 +2987,7 @@ TEST_F(CompilerTest, LibGVStore) {
   std::wstring Text = BlobToUtf16(pTextBlob);
   VERIFY_ARE_NOT_EQUAL(std::wstring::npos, Text.find(L"store"));
 }
+#endif // WIN32 - Reflection unsupported
 
 TEST_F(CompilerTest, PreprocessWhenValidThenOK) {
   CComPtr<IDxcCompiler> pCompiler;
@@ -3246,6 +3261,7 @@ TEST_F(CompilerTest, DISABLED_ManualFileCheckTest) {
 }
 
 
+#ifdef _WIN32 // Reflection unsupported
 TEST_F(CompilerTest, CodeGenHashStability) {
   CodeGenTestCheckBatchHash(L"");
 }
@@ -3253,6 +3269,7 @@ TEST_F(CompilerTest, CodeGenHashStability) {
 TEST_F(CompilerTest, BatchD3DReflect) {
   CodeGenTestCheckBatchDir(L"d3dreflect");
 }
+#endif // WIN32 - Reflection unsupported
 
 TEST_F(CompilerTest, BatchDxil) {
   CodeGenTestCheckBatchDir(L"dxil");
@@ -3279,7 +3296,7 @@ TEST_F(CompilerTest, BatchValidation) {
 }
 
 TEST_F(CompilerTest, BatchPIX) {
-  CodeGenTestCheckBatchDir(L"PIX");
+  CodeGenTestCheckBatchDir(L"pix");
 }
 
 TEST_F(CompilerTest, BatchSamples) {
