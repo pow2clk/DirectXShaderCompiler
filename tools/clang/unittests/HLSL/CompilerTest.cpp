@@ -3225,11 +3225,7 @@ TEST_F(CompilerTest, SubobjectCodeGenErrors) {
   }
 }
 
-#ifdef _WIN32
 TEST_F(CompilerTest, ManualFileCheckTest) {
-#else
-TEST_F(CompilerTest, DISABLED_ManualFileCheckTest) {
-#endif
   using namespace llvm;
   using namespace WEX::TestExecution;
 
