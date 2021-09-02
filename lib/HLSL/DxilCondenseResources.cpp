@@ -553,15 +553,8 @@ public:
     // Make sure no select on resource.
     bChanged |= RemovePhiOnResource();
 
-    if (m_bLegalizationFailed)
+    if (m_bIsLib || m_bLegalizationFailed)
       return bChanged;
-
-    if (m_bIsLib) {
-      if (DM.GetOP()->UseMinPrecision())
-        bChanged |= UpdateStructTypeForLegacyLayout();
-
-      return bChanged;
-    }
 
     bChanged = true;
 
@@ -571,6 +564,11 @@ public:
 
     GenerateDxilResourceHandles();
 
+    // TODO: Update types earlier for libraries and replace users, to
+    //       avoid having to preserve HL struct annotation.
+    // Note 1: Needs to happen after legalize
+    // Note 2: Cannot do this easily/trivially if any functions have
+    //         resource arguments (in offline linking target).
     if (DM.GetOP()->UseMinPrecision())
       UpdateStructTypeForLegacyLayout();
 
@@ -593,7 +591,7 @@ private:
   void UpdateResourceSymbols();
   void TranslateDxilResourceUses(DxilResourceBase &res);
   void GenerateDxilResourceHandles();
-  bool UpdateStructTypeForLegacyLayout();
+  void UpdateStructTypeForLegacyLayout();
   // Switch CBuffer for SRV for TBuffers.
   bool PatchDynamicTBuffers(DxilModule &DM);
   bool PatchTBuffers(DxilModule &DM);
@@ -1737,7 +1735,7 @@ StructType *UpdateStructTypeForLegacyLayout(StructType *ST,
   if (!bUpdated) {
     return ST;
   } else {
-    std::string legacyName = std::string(DXIL::kHostLayoutTypePrefix) + ST->getName().str();
+    std::string legacyName = "dx.alignment.legacy." + ST->getName().str();
     if (StructType *legacyST = M.getTypeByName(legacyName))
       return legacyST;
 
@@ -1765,9 +1763,8 @@ StructType *UpdateStructTypeForLegacyLayout(StructType *ST,
   }
 }
 
-bool UpdateStructTypeForLegacyLayout(DxilResourceBase &Res,
-                                     DxilTypeSystem &TypeSys, DxilModule &DM) {
-  Module &M = *DM.GetModule();
+void UpdateStructTypeForLegacyLayout(DxilResourceBase &Res,
+                                     DxilTypeSystem &TypeSys, Module &M) {
   Constant *Symbol = Res.GetGlobalSymbol();
   Type *ElemTy = Res.GetHLSLType()->getPointerElementType();
   // Support Array of ConstantBuffer/StructuredBuffer.
@@ -1777,7 +1774,7 @@ bool UpdateStructTypeForLegacyLayout(DxilResourceBase &Res,
   if (ST->isOpaque()) {
     DXASSERT(Res.GetClass() == DxilResourceBase::Class::CBuffer,
              "Only cbuffer can have opaque struct.");
-    return false;
+    return;
   }
 
   Type *UpdatedST =
@@ -1790,80 +1787,43 @@ bool UpdateStructTypeForLegacyLayout(DxilResourceBase &Res,
         M.getOrInsertGlobal(Symbol->getName().str() + "_legacy", UpdatedST));
     Res.SetGlobalSymbol(NewGV);
     Res.SetHLSLType(NewGV->getType());
-    OP *hlslOP = DM.GetOP();
+    // Delete old GV.
+    for (auto UserIt = Symbol->user_begin(); UserIt != Symbol->user_end();) {
+      Value *User = *(UserIt++);
+      if (Instruction *I = dyn_cast<Instruction>(User)) {
+        if (!User->user_empty())
+          I->replaceAllUsesWith(UndefValue::get(I->getType()));
 
-    if (DM.GetShaderModel()->IsLib()) {
-      TypeSys.EraseStructAnnotation(ST);
-      // If it's a library, we need to replace the GV which involves a few replacements
-      Function *NF = hlslOP->GetOpFunc(hlsl::OP::OpCode::CreateHandleForLib, UpdatedST);
-
-      // Replace old GV.
-      for (auto UserIt = Symbol->user_begin(); UserIt != Symbol->user_end();) {
-        Value *User = *(UserIt++);
-
-        if (LoadInst *ldInst = dyn_cast<LoadInst>(User)) {
-          if (!ldInst->user_empty()) {
-            IRBuilder<> Builder = IRBuilder<>(ldInst);
-            LoadInst *newLoad = Builder.CreateLoad(NewGV);
-            ArrayRef<Value *> args = {hlslOP->GetI32Const((unsigned)hlsl::OP::OpCode::CreateHandleForLib), newLoad};
-
-            for (auto user = ldInst->user_begin(); user != ldInst->user_end();) {
-              CallInst *CI = cast<CallInst>(*(user++));
-
-              CallInst *newCI = CallInst::Create(NF, args, "", CI);
-              CI->replaceAllUsesWith(newCI);
-              CI->eraseFromParent();
-            }
-          }
-          ldInst->eraseFromParent();
-        }
-      }
-    } else {
-      // If not a library, the GV should be deleted
-      for (auto UserIt = Symbol->user_begin(); UserIt != Symbol->user_end();) {
-        Value *User = *(UserIt++);
-
-        if (Instruction *I = dyn_cast<Instruction>(User)) {
-          if (!User->user_empty())
-            I->replaceAllUsesWith(UndefValue::get(I->getType()));
-
-          I->eraseFromParent();
-        } else {
-          ConstantExpr *CE = cast<ConstantExpr>(User);
-          if (!CE->user_empty())
-            CE->replaceAllUsesWith(UndefValue::get(CE->getType()));
-        }
+        I->eraseFromParent();
+      } else {
+        ConstantExpr *CE = cast<ConstantExpr>(User);
+        if (!CE->user_empty())
+          CE->replaceAllUsesWith(UndefValue::get(CE->getType()));
       }
     }
     Symbol->removeDeadConstantUsers();
 
     if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Symbol))
       GV->eraseFromParent();
-
-    return true;
   }
-
-  return false;
 }
 
-bool UpdateStructTypeForLegacyLayoutOnDM(DxilModule &DM) {
+void UpdateStructTypeForLegacyLayoutOnDM(DxilModule &DM) {
   DxilTypeSystem &TypeSys = DM.GetTypeSystem();
-  bool bChanged = false;
+  Module &M = *DM.GetModule();
   for (auto &CBuf : DM.GetCBuffers()) {
-    bChanged |= UpdateStructTypeForLegacyLayout(*CBuf.get(), TypeSys, DM);
+    UpdateStructTypeForLegacyLayout(*CBuf.get(), TypeSys, M);
   }
 
   for (auto &UAV : DM.GetUAVs()) {
     if (DXIL::IsStructuredBuffer(UAV->GetKind()))
-      bChanged |= UpdateStructTypeForLegacyLayout(*UAV.get(), TypeSys, DM);
+      UpdateStructTypeForLegacyLayout(*UAV.get(), TypeSys, M);
   }
 
   for (auto &SRV : DM.GetSRVs()) {
     if (SRV->IsStructuredBuffer() || SRV->IsTBuffer())
-      bChanged |= UpdateStructTypeForLegacyLayout(*SRV.get(), TypeSys, DM);
+      UpdateStructTypeForLegacyLayout(*SRV.get(), TypeSys, M);
   }
-
-  return bChanged;
 }
 
 } // namespace
@@ -1885,8 +1845,8 @@ void DxilLowerCreateHandleForLib::FailOnPoisonResources() {
   }
 }
 
-bool DxilLowerCreateHandleForLib::UpdateStructTypeForLegacyLayout() {
-  return UpdateStructTypeForLegacyLayoutOnDM(*m_DM);
+void DxilLowerCreateHandleForLib::UpdateStructTypeForLegacyLayout() {
+  UpdateStructTypeForLegacyLayoutOnDM(*m_DM);
 }
 
 // Change ResourceSymbol to undef if don't need.

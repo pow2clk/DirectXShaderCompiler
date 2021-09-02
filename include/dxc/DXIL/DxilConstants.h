@@ -1526,8 +1526,6 @@ namespace DXIL {
   extern const char *kDxBreakMDName;
   extern const char *kDxIsHelperGlobalName;
 
-  extern const char *kHostLayoutTypePrefix;
-
 } // namespace DXIL
 
 } // namespace hlsl

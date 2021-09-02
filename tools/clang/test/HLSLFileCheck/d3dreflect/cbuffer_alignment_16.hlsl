@@ -5,10 +5,10 @@
 // CHECK: ; cbuffer cbuf
 // CHECK: ; {
 // CHECK: ;
-// CHECK: ;   struct hostlayout.cbuf
+// CHECK: ;   struct cbuf
 // CHECK: ;   {
 // CHECK: ;
-// CHECK: ;       struct hostlayout.struct.Agg
+// CHECK: ;       struct struct.Agg
 // CHECK: ;       {
 // CHECK: ;
 // CHECK: ;           struct struct.Value
