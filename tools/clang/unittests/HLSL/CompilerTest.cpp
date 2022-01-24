@@ -76,7 +76,7 @@ static bool LooksLikeDir(std::wstring fileName) {
   return false;
 }
 
-class TestIncludeHandler : public IDxcIncludeHandler {
+class TestIncludeHandler final : public IDxcIncludeHandler {
   DXC_MICROCOM_REF_FIELD(m_dwRef)
 public:
   DXC_MICROCOM_ADDREF_RELEASE_IMPL(m_dwRef)
@@ -1493,7 +1493,7 @@ static void VerifyPdbUtil(dxc::DxcDllSupport &dllSupport,
 
 TEST_F(CompilerTest, CompileThenTestPdbUtilsStripped) {
   if (m_ver.SkipDxilVersion(1, 5)) return;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcBlobEncoding> pSource;
   CComPtr<IDxcOperationResult> pOperationResult;
@@ -1505,8 +1505,9 @@ TEST_F(CompilerTest, CompileThenTestPdbUtilsStripped) {
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(main_source.c_str(), &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back(included_File.c_str());
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back(included_File.c_str());
 
   const WCHAR *pArgs[] = { L"/Zi", L"/Od", L"-flegacy-macro-expansion", L"-Qstrip_debug", L"/DTHIS_IS_A_DEFINE=HELLO" };
   const DxcDefine pDefines[] = { L"THIS_IS_ANOTHER_DEFINE", L"1" };
@@ -1550,7 +1551,7 @@ TEST_F(CompilerTest, CompileThenTestPdbUtilsStripped) {
 }
 
 void CompilerTest::TestPdbUtils(bool bSlim, bool bSourceInDebugModule, bool bStrip) {
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcBlobEncoding> pSource;
   CComPtr<IDxcOperationResult> pOperationResult;
@@ -1571,8 +1572,9 @@ void CompilerTest::TestPdbUtils(bool bSlim, bool bSourceInDebugModule, bool bStr
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(main_source.c_str(), &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back(included_File.c_str());
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back(included_File.c_str());
 
   std::vector<const WCHAR *> args;
   std::vector<std::pair<const WCHAR *, const WCHAR *> > expectedArgs;
@@ -1939,10 +1941,11 @@ TEST_F(CompilerTest, CompileThenTestPdbUtilsRelativePath) {
   args.push_back(L"/Zs");
   args.push_back(L"shaders/Shader.hlsl");
 
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
   std::string included_File = "#define ZERO 0";
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back(included_File.c_str());
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back(included_File.c_str());
 
   CComPtr<IDxcResult> pResult;
   VERIFY_SUCCEEDED(pCompiler->Compile(&SourceBuf, args.data(), args.size(), pInclude, IID_PPV_ARGS(&pResult)));
@@ -2355,47 +2358,49 @@ TEST_F(CompilerTest, CompileWhenIncludeThenLoadInvoked) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
     "#include \"helper.h\"\r\n"
     "float4 main() : SV_Target { return 0; }", &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", nullptr, 0, nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
-  VERIFY_ARE_EQUAL_WSTR(L"./helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./helper.h;", pTestInclude->GetAllFileNames().c_str());
 }
 
 TEST_F(CompilerTest, CompileWhenIncludeThenLoadUsed) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
     "#include \"helper.h\"\r\n"
     "float4 main() : SV_Target { return ZERO; }", &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", nullptr, 0, nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
-  VERIFY_ARE_EQUAL_WSTR(L"./helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./helper.h;", pTestInclude->GetAllFileNames().c_str());
 }
 
 TEST_F(CompilerTest, CompileWhenIncludeAbsoluteThenLoadAbsolute) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
 #ifdef _WIN32 // OS-specific root
@@ -2409,16 +2414,17 @@ TEST_F(CompilerTest, CompileWhenIncludeAbsoluteThenLoadAbsolute) {
 #endif
 
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", nullptr, 0, nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
 #ifdef _WIN32 // OS-specific root
-  VERIFY_ARE_EQUAL_WSTR(L"C:\\helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"C:\\helper.h;", pTestInclude->GetAllFileNames().c_str());
 #else
-  VERIFY_ARE_EQUAL_WSTR(L"/helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"/helper.h;", pTestInclude->GetAllFileNames().c_str());
 #endif
 }
 
@@ -2426,23 +2432,24 @@ TEST_F(CompilerTest, CompileWhenIncludeLocalThenLoadRelative) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
     "#include \"..\\helper.h\"\r\n"
     "float4 main() : SV_Target { return ZERO; }", &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", nullptr, 0, nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
 #ifdef _WIN32 // OS-specific directory dividers
-  VERIFY_ARE_EQUAL_WSTR(L"./..\\helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./..\\helper.h;", pTestInclude->GetAllFileNames().c_str());
 #else
-  VERIFY_ARE_EQUAL_WSTR(L"./../helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./../helper.h;", pTestInclude->GetAllFileNames().c_str());
 #endif
 }
 
@@ -2450,7 +2457,7 @@ TEST_F(CompilerTest, CompileWhenIncludeSystemThenLoadNotRelative) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
@@ -2460,17 +2467,18 @@ TEST_F(CompilerTest, CompileWhenIncludeSystemThenLoadNotRelative) {
   LPCWSTR args[] = {
     L"-Ifoo"
   };
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#include <helper.h>");
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#include <helper.h>");
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", args, _countof(args), nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
 #ifdef _WIN32 // OS-specific directory dividers
-  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./foo\\helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./foo\\helper.h;", pTestInclude->GetAllFileNames().c_str());
 #else
-  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./foo/helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./foo/helper.h;", pTestInclude->GetAllFileNames().c_str());
 #endif
 }
 
@@ -2478,37 +2486,39 @@ TEST_F(CompilerTest, CompileWhenIncludeSystemMissingThenLoadAttempt) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
     "#include \"subdir/other/file.h\"\r\n"
     "float4 main() : SV_Target { return ZERO; }", &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#include <helper.h>");
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#include <helper.h>");
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
     L"ps_6_0", nullptr, 0, nullptr, 0, pInclude, &pResult));
   std::string failLog(VerifyOperationFailed(pResult));
   VERIFY_ARE_NOT_EQUAL(std::string::npos, failLog.find("<angled>")); // error message should prompt to use <angled> rather than "quotes"
-  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./subdir/other/helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./subdir/other/file.h;./subdir/other/helper.h;", pTestInclude->GetAllFileNames().c_str());
 }
 
 TEST_F(CompilerTest, CompileWhenIncludeFlagsThenIncludeUsed) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
     "#include <helper.h>\r\n"
     "float4 main() : SV_Target { return ZERO; }", &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("#define ZERO 0");
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("#define ZERO 0");
 
 #ifdef _WIN32  // OS-specific root
   LPCWSTR args[] = { L"-I\\\\server\\share" };
@@ -2519,9 +2529,9 @@ TEST_F(CompilerTest, CompileWhenIncludeFlagsThenIncludeUsed) {
     L"ps_6_0", args, _countof(args), nullptr, 0, pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
 #ifdef _WIN32  // OS-specific root
-  VERIFY_ARE_EQUAL_WSTR(L"\\\\server\\share\\helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"\\\\server\\share\\helper.h;", pTestInclude->GetAllFileNames().c_str());
 #else
-  VERIFY_ARE_EQUAL_WSTR(L"/server/share/helper.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"/server/share/helper.h;", pTestInclude->GetAllFileNames().c_str());
 #endif
 }
 
@@ -2529,7 +2539,7 @@ TEST_F(CompilerTest, CompileWhenIncludeMissingThenFail) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText(
@@ -2561,9 +2571,10 @@ TEST_F(CompilerTest, CompileWhenIncludeHasPathThenOK) {
     VERIFY_SUCCEEDED(pLibrary->CreateIncludeHandler(&pInclude));
     VERIFY_SUCCEEDED(pLibrary->CreateBlobFromFile(Source, nullptr, &pSource));
 #else
-    CComPtr<TestIncludeHandler> pInclude;
-    pInclude = new TestIncludeHandler(m_dllSupport);
-    pInclude->CallResults.emplace_back("// Empty");
+    CComPtr<IDxcIncludeHandler> pInclude;
+    TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+    pTestInclude->CallResults.emplace_back("// Empty");
     CreateBlobFromText("#include \"include.hlsl\"\r\n"
                        "float4 main() : SV_Target { return 0; }",
                        &pSource);
@@ -2581,21 +2592,22 @@ TEST_F(CompilerTest, CompileWhenIncludeEmptyThenOK) {
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
 
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobFromText("#include \"empty.h\"\r\n"
                      "float4 main() : SV_Target { return 0; }",
                      &pSource);
 
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back("", CP_ACP); // An empty file would get detected as ACP code page
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back("", CP_ACP); // An empty file would get detected as ACP code page
 
   VERIFY_SUCCEEDED(pCompiler->Compile(pSource, L"source.hlsl", L"main",
                                       L"ps_6_0", nullptr, 0, nullptr, 0,
                                       pInclude, &pResult));
   VerifyOperationSucceeded(pResult);
-  VERIFY_ARE_EQUAL_WSTR(L"./empty.h;", pInclude->GetAllFileNames().c_str());
+  VERIFY_ARE_EQUAL_WSTR(L"./empty.h;", pTestInclude->GetAllFileNames().c_str());
 }
 
 static const char EmptyCompute[] = "[numthreads(8,8,1)] void main() { }";
@@ -2642,12 +2654,13 @@ void CompilerTest::TestEncodingImpl(const void *sourceData, size_t sourceSize, U
   CComPtr<IDxcCompiler> pCompiler;
   CComPtr<IDxcOperationResult> pResult;
   CComPtr<IDxcBlobEncoding> pSource;
-  CComPtr<TestIncludeHandler> pInclude;
+  CComPtr<IDxcIncludeHandler> pInclude;
   VERIFY_SUCCEEDED(CreateCompiler(&pCompiler));
   CreateBlobPinned((const char *)sourceData, sourceSize, codePage,
                    &pSource);
-  pInclude = new TestIncludeHandler(m_dllSupport);
-  pInclude->CallResults.emplace_back(includedData, includedSize, CP_ACP);
+  TestIncludeHandler *pTestInclude = new TestIncludeHandler(m_dllSupport);
+  pInclude = pTestInclude;
+  pTestInclude->CallResults.emplace_back(includedData, includedSize, CP_ACP);
 
   const WCHAR *pArgs[] = {L"-encoding",
                           encoding};
