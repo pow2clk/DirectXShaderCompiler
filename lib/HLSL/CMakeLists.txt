@@ -64,4 +64,5 @@ add_llvm_library(LLVMHLSL
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/IR
 )
 
+include_directories(AFTER ${DIRECTX_HEADER_INCLUDE_DIR}/directx ${DIRECTX_HEADER_INCLUDE_DIR}/wsl/stubs)
 add_dependencies(LLVMHLSL intrinsics_gen)

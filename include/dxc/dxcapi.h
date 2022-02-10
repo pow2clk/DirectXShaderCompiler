@@ -636,6 +636,8 @@ struct IDxcPdbUtils : public IUnknown {
   virtual HRESULT STDMETHODCALLTYPE OverrideRootSignature(_In_ const WCHAR *pRootSignature) = 0;
 };
 
+CROSS_PLATFORM_UUIDOF(ID3D12LibraryReflection, "8E349D19-54DB-4A56-9DC9-119D87BDB804")
+CROSS_PLATFORM_UUIDOF(ID3D12ShaderReflection, "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E")
 // Note: __declspec(selectany) requires 'extern'
 // On Linux __declspec(selectany) is removed and using 'extern' results in link error.
 #ifdef _MSC_VER
@@ -721,5 +723,20 @@ CLSID_SCOPE const GUID CLSID_DxcPdbUtils = {
     0xf2ce,
     0x457e,
     {0xae, 0x8c, 0xec, 0x35, 0x5f, 0xae, 0xec, 0x7c}};
+
+
+// {5a58797d-a72c-478d-8ba2-efc6b0efe88e}
+CLSID_SCOPE const GUID CLSID_D3D12ShaderReflection = {
+    0x5a58797d,
+    0xa72c,
+    0x478d,
+    {0x8b, 0xa2, 0xef, 0xc6, 0xb0, 0xef, 0xe8, 0x8e}};
+
+// {8e349d19-54db-4a56-9dc9-119d87bdb804}
+CLSID_SCOPE const GUID CLSID_D3D12LibraryReflection = {
+    0x8e349d19,
+    0x54db,
+    0x4a56,
+    {0x9d, 0xc9, 0x11, 0x9d, 0x87, 0xbd, 0xb8, 0x04}};
 
 #endif
