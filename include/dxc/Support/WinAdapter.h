@@ -349,28 +349,67 @@
 
 #ifdef __cplusplus
 
+typedef unsigned char BYTE, UINT8;
 typedef unsigned char *LPBYTE;
 
+typedef BYTE BOOLEAN;
 typedef BOOLEAN *PBOOLEAN;
 
+typedef bool BOOL;
 typedef BOOL *LPBOOL;
 
+typedef int INT;
+typedef long LONG;
+typedef unsigned int UINT;
+typedef unsigned long ULONG;
+typedef long long LONGLONG;
+typedef long long LONG_PTR;
+typedef unsigned long long ULONG_PTR;
+typedef unsigned long long ULONGLONG;
+
+typedef uint16_t WORD;
+typedef uint32_t DWORD;
 typedef DWORD *LPDWORD;
 
-typedef signed char *PINT8;
-typedef signed int *PINT32;
+typedef uint32_t UINT32;
+typedef uint64_t UINT64;
+
+typedef signed char INT8, *PINT8;
+typedef signed int INT32, *PINT32;
+
+typedef size_t SIZE_T;
+typedef const char *LPCSTR;
+typedef const char *PCSTR;
 
 typedef int errno_t;
+
+typedef wchar_t WCHAR;
+typedef wchar_t *LPWSTR;
+typedef wchar_t *PWCHAR;
+typedef const wchar_t *LPCWSTR;
+typedef const wchar_t *PCWSTR;
 
 typedef WCHAR OLECHAR;
 typedef OLECHAR *BSTR;
 typedef OLECHAR *LPOLESTR;
+typedef char *LPSTR;
+
+typedef void *LPVOID;
+typedef const void *LPCVOID;
 
 typedef std::nullptr_t nullptr_t;
 
+typedef signed int HRESULT;
+
 //===--------------------- Handle Types -----------------------------------===//
 
+typedef void *HANDLE;
 
+#define DECLARE_HANDLE(name)                                                   \
+  struct name##__ {                                                            \
+    int unused;                                                                \
+  };                                                                           \
+  typedef struct name##__ *name
 DECLARE_HANDLE(HINSTANCE);
 
 typedef void *HMODULE;
@@ -381,13 +420,44 @@ typedef void *HMODULE;
 
 //===--------------------- ID Types and Macros for COM --------------------===//
 
+#ifdef __EMULATE_UUID
+struct GUID
+#else  // __EMULATE_UUID
+// These specific definitions are required by clang -fms-extensions.
+typedef struct _GUID
+#endif // __EMULATE_UUID
+{
+  uint32_t Data1;
+  uint16_t Data2;
+  uint16_t Data3;
+  uint8_t Data4[8];
+}
+#ifdef __EMULATE_UUID
+;
+#else  // __EMULATE_UUID
+GUID;
+#endif // __EMULATE_UUID
+typedef GUID CLSID;
+typedef const GUID &REFGUID;
+typedef const GUID &REFCLSID;
+
+typedef GUID IID;
 typedef IID *LPIID;
+typedef const IID &REFIID;
 inline bool IsEqualGUID(REFGUID rguid1, REFGUID rguid2) {
   // Optimization:
   if (&rguid1 == &rguid2)
     return true;
 
   return !memcmp(&rguid1, &rguid2, sizeof(GUID));
+}
+
+inline bool operator==(REFGUID guidOne, REFGUID guidOther) {
+  return !!IsEqualGUID(guidOne, guidOther);
+}
+
+inline bool operator!=(REFGUID guidOne, REFGUID guidOther) {
+  return !(guidOne == guidOther);
 }
 
 inline bool IsEqualIID(REFIID riid1, REFIID riid2) {
@@ -431,6 +501,26 @@ typedef struct _WIN32_FIND_DATAW {
   WCHAR cFileName[260];
   WCHAR cAlternateFileName[14];
 } WIN32_FIND_DATAW, *PWIN32_FIND_DATAW, *LPWIN32_FIND_DATAW;
+
+typedef union _LARGE_INTEGER {
+  struct {
+    DWORD LowPart;
+    DWORD HighPart;
+  } u;
+  LONGLONG QuadPart;
+} LARGE_INTEGER;
+
+typedef LARGE_INTEGER *PLARGE_INTEGER;
+
+typedef union _ULARGE_INTEGER {
+  struct {
+    DWORD LowPart;
+    DWORD HighPart;
+  } u;
+  ULONGLONG QuadPart;
+} ULARGE_INTEGER;
+
+typedef ULARGE_INTEGER *PULARGE_INTEGER;
 
 typedef struct tagSTATSTG {
   LPOLESTR pwcsName;
@@ -492,11 +582,11 @@ constexpr GUID guid_from_string(const char str[37]) {
                byte_from_hexstr(str + 32), byte_from_hexstr(str + 34)}};
 }
 
-template <typename iface> inline GUID __emulated_uuidof();
+template <typename interface> inline GUID __emulated_uuidof();
 
-#define CROSS_PLATFORM_UUIDOF(iface, spec)                                 \
-  struct iface;                                                            \
-  template <> inline GUID __emulated_uuidof<iface>() {                     \
+#define CROSS_PLATFORM_UUIDOF(interface, spec)                                 \
+  struct interface;                                                            \
+  template <> inline GUID __emulated_uuidof<interface>() {                     \
     static const IID _IID = guid_from_string(spec);                            \
     return _IID;                                                               \
   }
@@ -510,8 +600,8 @@ template <typename iface> inline GUID __emulated_uuidof();
 
 #ifndef CROSS_PLATFORM_UUIDOF
 // Warning: This macro exists in dxcapi.h as well
-#define CROSS_PLATFORM_UUIDOF(iface, spec)                                 \
-  struct __declspec(uuid(spec)) iface;
+#define CROSS_PLATFORM_UUIDOF(interface, spec)                                 \
+  struct __declspec(uuid(spec)) interface;
 #endif
 
 template <typename T> inline void **IID_PPV_ARGS_Helper(T **pp) {
