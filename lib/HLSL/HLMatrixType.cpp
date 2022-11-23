@@ -130,7 +130,7 @@ bool HLMatrixType::isMatrixPtrOrArrayPtr(Type *Ty) {
   PointerType *PtrTy = llvm::dyn_cast<PointerType>(Ty);
   if (PtrTy == nullptr) return false;
   Ty = PtrTy->getElementType();
-  while (ArrayType *ArrayTy = llvm::dyn_cast<ArrayType>(Ty))
+  while (llvm::isa<ArrayType>(Ty))
     Ty = Ty->getArrayElementType();
   return isa(Ty);
 }

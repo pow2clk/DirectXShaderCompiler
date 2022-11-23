@@ -351,6 +351,7 @@ protected:
     : ValueHandleBase(Callback, RHS) {}
 
   virtual ~CallbackVH() {}
+  CallbackVH &operator=(const CallbackVH &) = default;
 
   void setValPtr(Value *P) {
     ValueHandleBase::operator=(P);

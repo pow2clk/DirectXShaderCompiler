@@ -814,7 +814,7 @@ bool isSameType(const ASTContext &astContext, QualType type1, QualType type2) {
 
 QualType desugarType(QualType type, llvm::Optional<bool> *isRowMajor) {
   if (const auto *attrType = type->getAs<AttributedType>()) {
-    switch (auto kind = attrType->getAttrKind()) {
+    switch (attrType->getAttrKind()) {
     // HLSL row-major is SPIR-V col-major
     case AttributedType::attr_hlsl_row_major:
       *isRowMajor = false;

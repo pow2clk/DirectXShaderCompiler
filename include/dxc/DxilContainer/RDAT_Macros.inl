@@ -151,7 +151,7 @@
 
   #define RDAT_STRUCT(type) \
     template<> bool ValidateRecord<type>(const RDATContext &ctx, const type *pRecord) { \
-      type##_Reader reader(BaseRecordReader(&ctx, (void*)pRecord, (uint32_t)RecordTraits<type>::RecordSize()));
+      type##_Reader reader(BaseRecordReader(&ctx, (const void*)pRecord, (uint32_t)RecordTraits<type>::RecordSize()));
   #define RDAT_STRUCT_DERIVED(type, base) RDAT_STRUCT(type)
   #define RDAT_STRUCT_END()                   return true; }
   #define RDAT_UNION_IF(name, expr)           if (reader.has##name()) {

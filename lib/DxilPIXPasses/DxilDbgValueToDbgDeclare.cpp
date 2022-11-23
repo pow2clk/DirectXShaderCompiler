@@ -272,7 +272,6 @@ private:
       llvm::DICompositeType *Ty
   );
 
-  llvm::DILocation *GetVariableLocation() const;
   llvm::Value *GetMetadataAsValue(
       llvm::Metadata *M
   ) const;
@@ -544,7 +543,7 @@ static bool SortMembers(
             return false;
         }
         case llvm::dwarf::DW_TAG_subprogram: {
-            if (auto* SubProgram = llvm::dyn_cast<llvm::DISubprogram>(Element)) {
+            if (llvm::isa<llvm::DISubprogram>(Element)) {
                 continue;
             }
             assert(!"DISubprogram not understood");
@@ -1098,16 +1097,6 @@ void VariableRegisters::PopulateAllocaMap_StructType(
           OffsetAndMember.second->getBaseType().resolve(EmptyMap));
     }
   }
-}
-
-llvm::DILocation *VariableRegisters::GetVariableLocation() const
-{
-  const unsigned DefaultColumn = 1;
-  return llvm::DILocation::get(
-      m_B.getContext(),
-      m_Variable->getLine(),
-      DefaultColumn,
-      m_Variable->getScope());
 }
 
 llvm::Value *VariableRegisters::GetMetadataAsValue(

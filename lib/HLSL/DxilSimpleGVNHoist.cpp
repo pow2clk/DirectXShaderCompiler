@@ -104,21 +104,13 @@ class ValueTable {
 
 public:
   ValueTable();
-  ValueTable(const ValueTable &Arg);
-  ValueTable(ValueTable &&Arg);
+  ValueTable(const ValueTable &Arg) = delete;
+  ValueTable(ValueTable &&Arg) = delete;
   ~ValueTable();
 
   uint32_t lookupOrAdd(Value *V);
-  uint32_t lookup(Value *V, bool Verify = true) const;
-  uint32_t lookupOrAddCmp(unsigned Opcode, CmpInst::Predicate Pred, Value *LHS,
-                          Value *RHS);
-  bool exists(Value *V) const;
-  void add(Value *V, uint32_t num);
-  void clear();
-  void erase(Value *v);
   void setDomTree(DominatorTree *D) { DT = D; }
   uint32_t getNextUnusedValueNumber() { return nextValueNumber; }
-  void verifyRemoved(const Value *) const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -239,14 +231,7 @@ Expression ValueTable::createExtractvalueExpr(ExtractValueInst *EI) {
 //===----------------------------------------------------------------------===//
 
 ValueTable::ValueTable() = default;
-ValueTable::ValueTable(const ValueTable &) = default;
-ValueTable::ValueTable(ValueTable &&) = default;
 ValueTable::~ValueTable() = default;
-
-/// add - Insert a value into the table with a specified value number.
-void ValueTable::add(Value *V, uint32_t num) {
-    valueNumbering.insert(std::make_pair(V, num));
-}
 
 uint32_t ValueTable::lookupOrAddCall(CallInst *C) {
   Function *F = C->getCalledFunction();
@@ -298,9 +283,6 @@ uint32_t ValueTable::lookupOrAddCall(CallInst *C) {
     return nextValueNumber++;
   }
 }
-
-/// Returns true if a value number exists for the specified value.
-bool ValueTable::exists(Value *V) const { return valueNumbering.count(V) != 0; }
 
 /// lookup_or_add - Returns the value number for the specified value, assigning
 /// it a new number if it did not have one before.
@@ -373,52 +355,6 @@ uint32_t ValueTable::lookupOrAdd(Value *V) {
   uint32_t e = assignExpNewValueNum(exp).first;
   valueNumbering[V] = e;
   return e;
-}
-
-/// Returns the value number of the specified value. Fails if
-/// the value has not yet been numbered.
-uint32_t ValueTable::lookup(Value *V, bool Verify) const {
-  DenseMap<Value*, uint32_t>::const_iterator VI = valueNumbering.find(V);
-  if (Verify) {
-    assert(VI != valueNumbering.end() && "Value not numbered?");
-    return VI->second;
-  }
-  return (VI != valueNumbering.end()) ? VI->second : 0;
-}
-
-/// Returns the value number of the given comparison,
-/// assigning it a new number if it did not have one before.  Useful when
-/// we deduced the result of a comparison, but don't immediately have an
-/// instruction realizing that comparison to hand.
-uint32_t ValueTable::lookupOrAddCmp(unsigned Opcode,
-                                         CmpInst::Predicate Predicate,
-                                         Value *LHS, Value *RHS) {
-  Expression exp = createCmpExpr(Opcode, Predicate, LHS, RHS);
-  return assignExpNewValueNum(exp).first;
-}
-
-/// Remove all entries from the ValueTable.
-void ValueTable::clear() {
-  valueNumbering.clear();
-  expressionNumbering.clear();
-  nextValueNumber = 1;
-  Expressions.clear();
-  ExprIdx.clear();
-  nextExprNumber = 0;
-}
-
-/// Remove a value from the value numbering.
-void ValueTable::erase(Value *V) {
-  valueNumbering.erase(V);
-}
-
-/// verifyRemoved - Verify that the value is removed from all internal data
-/// structures.
-void ValueTable::verifyRemoved(const Value *V) const {
-  for (DenseMap<Value*, uint32_t>::const_iterator
-         I = valueNumbering.begin(), E = valueNumbering.end(); I != E; ++I) {
-    assert(I->first != V && "Inst still occurs in value numbering map!");
-  }
 }
 
 /// Return a pair the first field showing the value number of \p Exp and the

@@ -1205,7 +1205,7 @@ bool RemoveAddrSpaceCasts(Value *Val, Value *NewVal,
       } else {
         DXASSERT(false, "RemoveAddrSpaceCasts: unhandled pointer ConstantExpr");
       }
-    } else if (Instruction *I = dyn_cast<Instruction>(user)) {
+    } else if (isa<Instruction>(user)) {
       if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(user)) {
         if (bConstructReplacement) {
           IRBuilder<> Builder(GEP);

@@ -31,6 +31,8 @@ public:
   SortDebugInfoVisitor(SpirvContext &spvCtx, const SpirvCodeGenOptions &opts)
       : Visitor(opts, spvCtx) {}
 
+  using Visitor::visit;
+
   // Sorts debug instructions in a post order to remove invalid forward
   // references. Note that the post order guarantees a successor node is not
   // visited before its predecessor and this property can be used to sort

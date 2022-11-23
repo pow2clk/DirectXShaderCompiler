@@ -131,7 +131,6 @@ private:
   std::unordered_map<llvm::Value *, ValueSetType> m_StoresPerDeclCache;
 
 
-  void Clear();
   void DetermineMaxPackedLocation(DxilSignature &DxilSig, unsigned *pMaxSigLoc,
                                   unsigned NumStreams);
   void ComputeReachableFunctionsRec(llvm::CallGraph &CG,
@@ -254,12 +253,6 @@ void DxilViewIdStateBuilder::EntryInfo::Clear() {
   Outputs.clear();
   for (unsigned i = 0; i < kNumStreams; i++)
     ContributingInstructions[i].clear();
-}
-
-void DxilViewIdStateBuilder::FuncInfo::Clear() {
-  Returns.clear();
-  CtrlDep.Clear();
-  pDomTree.reset();
 }
 
 void DxilViewIdStateBuilder::DetermineMaxPackedLocation(DxilSignature &DxilSig,

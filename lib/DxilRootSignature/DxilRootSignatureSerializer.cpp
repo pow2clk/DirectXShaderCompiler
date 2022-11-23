@@ -524,7 +524,7 @@ void DeserializeRootSignature(const void *pSrcData,
   const char *pData = (const char *)pSrcData;
   IFTBOOL(pData + sizeof(uint32_t) < pData + SrcDataSizeInBytes, E_FAIL);
 
-  DxilRootSignatureVersion Version = (const DxilRootSignatureVersion)((const uint32_t*)pData)[0];
+  const DxilRootSignatureVersion Version = (const DxilRootSignatureVersion)(((const uint32_t*)pData)[0]);
 
   pRootSignature = new DxilVersionedRootSignatureDesc();
 

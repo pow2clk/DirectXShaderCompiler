@@ -33,6 +33,8 @@ public:
         spvBuilder(builder), spvTypeVisitor(lowerTypeVisitor),
         currentDebugInstructionLayoutRule(SpirvLayoutRule::Void) {}
 
+  using Visitor::visit;
+
   // Visiting different SPIR-V constructs.
   bool visit(SpirvModule *module, Phase);
   bool visit(SpirvBasicBlock *, Phase) { return true; }

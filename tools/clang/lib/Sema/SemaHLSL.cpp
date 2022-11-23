@@ -3167,7 +3167,6 @@ private:
   {
     DXASSERT_NOMSG(name != nullptr);
     DXASSERT_NOMSG(recordDecl != nullptr);
-    DXASSERT_NOMSG(templateParamNamedDecls != nullptr);
     DXASSERT_NOMSG(templateParamNamedDeclsCount != nullptr);
     DXASSERT(*templateParamNamedDeclsCount < _countof(templateParamNamedDecls), "otherwise constants should be updated");
     _Analysis_assume_(*templateParamNamedDeclsCount < _countof(templateParamNamedDecls));
@@ -5076,7 +5075,7 @@ public:
       if (TemplateArgList.size() == 1) {
         const TemplateArgumentLoc &argLoc = TemplateArgList[0];
         const TemplateArgument &arg = argLoc.getArgument();
-        DXASSERT(arg.getKind() == TemplateArgument::ArgKind::Type, "");
+        DXASSERT_NOMSG(arg.getKind() == TemplateArgument::ArgKind::Type);
         QualType argType = arg.getAsType();
         SourceLocation argSrcLoc = argLoc.getLocation();
         if (IsScalarType(argType) || IsVectorType(m_sema, argType) ||
@@ -8301,7 +8300,7 @@ ExprResult HLSLExternalSource::LookupArrayMemberExprForHLSL(
 
   // The only property available on arrays is Length; it is deprecated and available only on HLSL version <=2018
   if (member->getLength() == 6 && 0 == strcmp(memberText, "Length")) {
-    if (const ConstantArrayType *CAT = dyn_cast<ConstantArrayType>(BaseType)) {
+    if (isa<ConstantArrayType>(BaseType)) {
       // check version support
       hlsl::LangStd hlslVer = getSema()->getLangOpts().HLSLVersion;
       if (hlslVer > hlsl::LangStd::v2016) {
@@ -11143,7 +11142,7 @@ bool hlsl::ShouldSkipNRVO(clang::Sema& sema, clang::QualType returnType, clang::
     // spot. This causes many extra dx.storeOutput's to be emitted.
     //
     // Check if this is an entry function the easy way if we're a library
-    if (const HLSLShaderAttr *Attr = FD->getAttr<HLSLShaderAttr>()) {
+    if (FD->hasAttr<HLSLShaderAttr>()) {
       return true;
     }
     // Check if it's an entry function the hard way
@@ -12138,8 +12137,7 @@ bool ValidateAttributeTargetIsFunction(Sema& S, Decl* D, const AttributeList &A)
 
 void Sema::DiagnoseHLSLDeclAttr(const Decl *D, const Attr *A) {
   HLSLExternalSource *ExtSource = HLSLExternalSource::FromSema(this);
-  if (const HLSLGloballyCoherentAttr *HLSLGCAttr =
-          dyn_cast<HLSLGloballyCoherentAttr>(A)) {
+  if (isa<HLSLGloballyCoherentAttr>(A)) {
     const ValueDecl *TD = cast<ValueDecl>(D);
     if (!TD->getType()->isDependentType()) {
       QualType DeclType = TD->getType();

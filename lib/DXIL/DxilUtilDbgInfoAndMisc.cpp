@@ -14,7 +14,6 @@
 #include "dxc/DXIL/DxilUtil.h"
 #include "dxc/DXIL/DxilModule.h"
 #include "dxc/DXIL/DxilOperations.h"
-#include "dxc/HLSL/DxilConvergentName.h"
 #include "dxc/Support/Global.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -124,7 +123,7 @@ bool MergeGepUse(Value *V) {
   addUsersToWorklist(V);
   while (worklist.size()) {
     V = worklist.pop_back_val();
-    if (BitCastOperator *BCO = dyn_cast<BitCastOperator>(V)) {
+    if (isa<BitCastOperator>(V)) {
       if (Value *NewV = dxilutil::TryReplaceBaseCastWithGep(V)) {
         changed = true;
         worklist.push_back(NewV);

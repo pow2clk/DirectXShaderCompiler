@@ -937,7 +937,7 @@ public:
   // This is used to quickly skip the common case where no work is needed
   bool AreGEPUsersTrivial(GEPOperator *GEP) {
     if (GlobalVariable *GV = LookupResourceGV(GEP)) {
-      if (GEP->getPointerOperand() != LookupResourceGV(GEP))
+      if (GEP->getPointerOperand() != GV)
         return false;
     }
     for (auto U : GEP->users()) {
@@ -973,18 +973,20 @@ public:
       // follow the pointer up
       AssignResourceGVFromStore(GV, GEP->getPointerOperand(), visited, bNonUniform);
       return;
-    } else if (PHINode *Phi = dyn_cast<PHINode>(V)) {
+    } else if (isa<PHINode>(V)) {
 #ifdef SUPPORT_SELECT_ON_ALLOCA
       // follow all incoming values
+      PHINode *Phi = cast<PHINode>(V);
       for (auto it : Phi->operand_values())
         AssignResourceGVFromStore(GV, it, visited, bNonUniform);
 #else
       m_Errors.ReportError(ResourceUseErrors::AllocaUserDisallowed, V);
 #endif
       return;
-    } else if (SelectInst *Sel = dyn_cast<SelectInst>(V)) {
+    } else if (isa<SelectInst>(V)) {
 #ifdef SUPPORT_SELECT_ON_ALLOCA
       // follow all incoming values
+      SelectInst *Sel = cast<SelectInst>(V);
       AssignResourceGVFromStore(GV, Sel->getTrueValue(), visited, bNonUniform);
       AssignResourceGVFromStore(GV, Sel->getFalseValue(), visited, bNonUniform);
 #else
@@ -1080,7 +1082,7 @@ public:
       Allocas.insert(AI);
       // set bAlloca for users
       bAlloca = true;
-    } else if (Constant *C = dyn_cast<Constant>(V)) {
+    } else if (isa<Constant>(V)) {
       // skip @llvm.used entry
       return;
     } else if (BitCastInst *BCI = dyn_cast<BitCastInst>(V)) {
@@ -2148,11 +2150,11 @@ void DxilLowerCreateHandleForLib::TranslateDxilResourceUses(
                                 bCreateFromBinding ? 4 : 5);
 
   const unsigned resIdxOpIdx = bCreateFromBinding
-                                   ? DxilInst_CreateHandleFromBinding::arg_index
-                                   : DxilInst_CreateHandle::arg_index;
+                                   ? (unsigned)DxilInst_CreateHandleFromBinding::arg_index
+                                   : (unsigned)DxilInst_CreateHandle::arg_index;
   const unsigned nonUniformOpIdx = bCreateFromBinding
-                                   ? DxilInst_CreateHandleFromBinding::arg_nonUniformIndex
-                                   : DxilInst_CreateHandle::arg_nonUniformIndex;
+                                   ? (unsigned)DxilInst_CreateHandleFromBinding::arg_nonUniformIndex
+                                   : (unsigned)DxilInst_CreateHandle::arg_nonUniformIndex;
 
 
 
@@ -2658,7 +2660,7 @@ static void CollectCBufferMemberUsage(Value *V,
   for (auto U : V->users()) {
     if (Constant *C = dyn_cast<Constant>(U)) {
       CollectCBufferMemberUsage(C, legacyFieldMap, newFieldMap, hlslOP, bMinPrecision, visited);
-    } else if (LoadInst *LI = dyn_cast<LoadInst>(U)) {
+    } else if (isa<LoadInst>(U)) {
       CollectCBufferMemberUsage(U, legacyFieldMap, newFieldMap, hlslOP, bMinPrecision, visited);
     } else if (CallInst *CI = dyn_cast<CallInst>(U)) {
       if (hlslOP->IsDxilOpFuncCallInst(CI)) {

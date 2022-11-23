@@ -298,7 +298,7 @@ TEST_F(DxilModuleTest, Precise2) {
 
 TEST_F(DxilModuleTest, Precise3) {
   // TODO: Enable this test when precise metadata is inserted for Gis.
-  if (const bool GisIsBroken = true) return;
+  if (/*GisIsBroken*/true) return;
   Compiler c(m_dllSupport);
   c.Compile(
     "float main(float x : X, float y : Y) : SV_Target {\n"

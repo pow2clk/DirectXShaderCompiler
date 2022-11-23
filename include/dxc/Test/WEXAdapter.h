@@ -18,8 +18,12 @@
 #define CONCAT(a, b) CONCAT1(a, b)
 
 // Determine how many arguments are passed to NARG() up to 3
+#define EXPAND(x) x
 #define ARG_CT(_1, _2, _3, N, ...) N
-#define NARG(...) ARG_CT(__VA_ARGS__, 3, 2, 1, 0)
+#define NARG(...) EXPAND(ARG_CT(__VA_ARGS__, 3, 2, 1, 0))
+
+
+
 
 // Call the appropriate arity macro based on number of arguments
 #define MACRO_N_(PREFIX, N, ...) CONCAT(PREFIX, N)(__VA_ARGS__)

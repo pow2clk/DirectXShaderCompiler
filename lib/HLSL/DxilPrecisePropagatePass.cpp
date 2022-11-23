@@ -33,7 +33,6 @@ struct FuncInfo {
   ControlDependence CtrlDep;
   std::unique_ptr<llvm::DominatorTreeBase<llvm::BasicBlock>> pPostDom;
   void Init(Function *F);
-  void Clear();
 };
 typedef std::unordered_map<llvm::Function *, std::unique_ptr<FuncInfo>> FuncInfoMap;
 
@@ -335,10 +334,7 @@ void FuncInfo::Init(Function *F) {
     CtrlDep.Compute(F, *pPostDom);
   }
 }
-void FuncInfo::Clear() {
-  CtrlDep.Clear();
-  pPostDom.reset();
-}
+
 FuncInfo &DxilPrecisePropagatePass::GetFuncInfo(Function *F) {
   auto &FI = m_FuncInfo[F];
   if (!FI) {

@@ -327,7 +327,7 @@ Type *DxilMutateResourceToHandle::mutateToHandleTy(Type *Ty, bool bResType) {
     return it->second;
 
   Type *ResultTy = nullptr;
-  if (ArrayType *AT = dyn_cast<ArrayType>(Ty)) {
+  if (isa<ArrayType>(Ty)) {
     SmallVector<unsigned, 2> nestedSize;
     Type *EltTy = Ty;
     while (ArrayType *NestAT = dyn_cast<ArrayType>(EltTy)) {

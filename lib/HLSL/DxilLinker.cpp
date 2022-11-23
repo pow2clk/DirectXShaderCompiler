@@ -114,7 +114,6 @@ class DxilLib {
 public:
   DxilLib(std::unique_ptr<llvm::Module> pModule);
   virtual ~DxilLib() {}
-  bool HasFunction(std::string &name);
   llvm::StringMap<std::unique_ptr<DxilFunctionLinkInfo>> &GetFunctionTable() {
     return m_functionNameMap;
   }
@@ -326,10 +325,6 @@ void DxilLib::CollectUsedInitFunctions(SetVector<StringRef> &addedFunctionSet,
         break;
     }
   }
-}
-
-bool DxilLib::HasFunction(std::string &name) {
-  return m_functionNameMap.count(name);
 }
 
 bool DxilLib::IsEntry(llvm::Function *F) { return m_entrySet.count(F); }
@@ -706,8 +701,7 @@ void DxilLinkJob::AddFunctions(DxilModule &DM, ValueToValueMapTy &vmap) {
     if (!NewF->hasFnAttribute(llvm::Attribute::NoInline))
       NewF->addFnAttr(llvm::Attribute::AlwaysInline);
 
-    if (DxilFunctionAnnotation *funcAnnotation =
-            tmpTypeSys.GetFunctionAnnotation(F)) {
+    if (tmpTypeSys.GetFunctionAnnotation(F)) {
       // Clone funcAnnotation to typeSys.
       typeSys.CopyFunctionAnnotation(NewF, F, tmpTypeSys);
     }
@@ -1135,7 +1129,7 @@ findResourceFromPtr(Value *Ptr, DxilModule &DM,
   if (Ptr)
     return it->second;
   DxilResourceBase *Res = nullptr;
-  if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Ptr)) {
+  if (isa<GlobalVariable>(Ptr)) {
     DXASSERT(false, "global resource should already in map");
   } else {
     // Not support allocaInst of resource when missing annotateHandle.
