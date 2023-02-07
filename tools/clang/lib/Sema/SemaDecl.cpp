@@ -3306,9 +3306,6 @@ void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
     return New->setInvalidDecl();
   }
     else if (MergeState == ShadowMergeState_Possible) {
-      Diag(New->getLocation(), diag::warn_hlsl_for_redefinition_different_type)
-        << New->getDeclName() << New->getType() << Old->getType();
-      Diag(Old->getLocation(), diag::note_previous_definition);
       MergeState = ShadowMergeState_Effective;
       MergeTypeWithOld = false;
     }
@@ -3507,9 +3504,6 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& 
       Diag(OldLocation, PrevDiag);
       return New->setInvalidDecl();
     } else if (MergeState == ShadowMergeState_Possible) {
-      Diag(New->getLocation(), diag::warn_hlsl_for_redefinition)
-          << New->getDeclName();
-      Diag(Old->getLocation(), diag::note_previous_definition);
       MergeState = ShadowMergeState_Effective;
     }
     // HLSL Change Ends
@@ -3555,8 +3549,6 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& 
         return;
       }
       else if (MergeState == ShadowMergeState_Possible) {
-        Diag(New->getLocation(), diag::warn_hlsl_for_redefinition) << New->getDeclName();
-        Diag(Old->getLocation(), diag::note_previous_definition);
         MergeState = ShadowMergeState_Effective;
       }
       // HLSL Change Ends
@@ -6283,6 +6275,9 @@ void Sema::CheckShadow(Scope *S, VarDecl *D, const LookupResult& R) {
   // Emit warning and note.
   if (getSourceManager().isInSystemMacro(R.getNameLoc()))
     return;
+  if (S->isForDeclScope())
+    Diag(R.getNameLoc(), diag::warn_hlsl_for_redefinition) << Name;
+  else
   Diag(R.getNameLoc(), diag::warn_decl_shadow) << Name << Kind << OldDC;
   Diag(ShadowedDecl->getLocation(), diag::note_previous_declaration);
 }
