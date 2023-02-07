@@ -3292,7 +3292,6 @@ void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
     // Neither C nor C++ requires a diagnostic for this, but we should still try
     // to diagnose it.
     // HLSL Change Starts
-    if (MergeState == ShadowMergeState_Disallowed) {
       Diag(New->getLocation(), New->isThisDeclarationADefinition()
                                  ? diag::err_redefinition_different_type
                                  : diag::err_redeclaration_different_type)
@@ -3304,12 +3303,6 @@ void Sema::MergeVarDeclTypes(VarDecl *New, VarDecl *Old,
         getNoteDiagForInvalidRedeclaration(Old, New);
     Diag(OldLocation, PrevDiag);
     return New->setInvalidDecl();
-  }
-    else if (MergeState == ShadowMergeState_Possible) {
-      MergeState = ShadowMergeState_Effective;
-      MergeTypeWithOld = false;
-    }
-    // HLSL Change Ends
   }
 
   // Don't actually update the type on the new declaration if the old
@@ -3498,15 +3491,9 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& 
       // Don't complain about out-of-line definitions of static members.
       !(Old->getLexicalDeclContext()->isRecord() &&
         !New->getLexicalDeclContext()->isRecord())) {
-    // HLSL Change Starts
-    if (MergeState == ShadowMergeState_Disallowed) {
       Diag(New->getLocation(), diag::err_redefinition) << New->getDeclName();
       Diag(OldLocation, PrevDiag);
       return New->setInvalidDecl();
-    } else if (MergeState == ShadowMergeState_Possible) {
-      MergeState = ShadowMergeState_Effective;
-    }
-    // HLSL Change Ends
   }
 
   if (New->getTLSKind() != Old->getTLSKind()) {
@@ -3541,17 +3528,10 @@ void Sema::MergeVarDecl(VarDecl *New, LookupResult &Previous, ShadowMergeState& 
       // The previous definition is hidden, and multiple definitions are
       // permitted (in separate TUs). Form another definition of it.
     } else {
-      // HLSL Change Starts
-      if (MergeState == ShadowMergeState_Disallowed) {
         Diag(New->getLocation(), diag::err_redefinition) << New;
         Diag(Def->getLocation(), diag::note_previous_definition);
         New->setInvalidDecl();
         return;
-      }
-      else if (MergeState == ShadowMergeState_Possible) {
-        MergeState = ShadowMergeState_Effective;
-      }
-      // HLSL Change Ends
     }
   }
 
