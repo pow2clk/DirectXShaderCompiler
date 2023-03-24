@@ -359,7 +359,7 @@ void [[]] SetMeshOutputCounts(in uint numVertices, in uint numPrimitives);
 void [[]] DispatchMesh(in uint threadGroupCountX, in uint threadGroupCountY, in uint threadGroupCountZ, in udt meshPayload);
 
 // Return true if the current lane is a helper lane
-bool [[ro]] IsHelperLane();
+bool [[ro,wv]] IsHelperLane();
 
 // HL Op for allocating ray query object that default constructor uses
 uint [[hidden]] AllocateRayQuery(in uint flags);

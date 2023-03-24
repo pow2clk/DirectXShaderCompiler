@@ -117,6 +117,7 @@ struct DxilEraseDeadRegion : public FunctionPass {
     assert(Region.count(
         BB)); // Region must be a complete region that contains the block.
 
+    //return false;
     auto FindIt = m_SafeBlocks.find(BB);
     if (FindIt != m_SafeBlocks.end()) {
       return FindIt->second;
