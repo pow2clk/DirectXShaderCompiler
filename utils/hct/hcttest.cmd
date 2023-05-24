@@ -22,6 +22,7 @@ set TEST_ALL=1
 set TEST_CLANG=0
 set TEST_CMD=0
 set TEST_EXEC=0
+set TEST_DXILLIB=0
 set TEST_DXILCONV=0
 set TEST_DXILCONV_FILTER=
 set TEST_EXEC_FUTURE=0
@@ -90,6 +91,7 @@ if "%1"=="-clean" (
 ) else if "%1"=="clang" (
   set TEST_ALL=0
   set TEST_CLANG=1
+  set TEST_DXILLIB=1
 ) else if "%1"=="clang-filter" (
   set TEST_ALL=0
   set TEST_CLANG=1
@@ -114,6 +116,9 @@ if "%1"=="-clean" (
 ) else if "%1" == "dxilconv" (
   set TEST_ALL=0
   set TEST_DXILCONV=1
+) else if "%1" == "dxillib" (
+  set TEST_ALL=0
+  set TEST_DXILLIB=1
 ) else if "%1" == "dxilconv-filter" (
   set TEST_ALL=0
   set TEST_DXILCONV=1
@@ -126,6 +131,7 @@ if "%1"=="-clean" (
   set TEST_CLANG=1
   set TEST_CMD=1
   set TEST_DXILCONV=1
+  set TEST_DXILLIB=1
 ) else if "%1"=="exec" (
   rem If exec is explicitly supplied, hcttest will fail if machine is not configured
   rem to run execution tests, otherwise, execution tests would be skipped.
@@ -237,6 +243,7 @@ if "%TEST_ALL%"=="1" (
   set TEST_EXEC=1
   set TEST_EXTRAS=1
   set TEST_DXILCONV=1
+  set TEST_DXILLIB=1
 )
 
 where te.exe 1>nul 2>nul
@@ -376,6 +383,12 @@ if defined DXIL_DLL_LOC (
   echo Copying DXIL.dll to %TEST_DIR%:
   call %HCT_DIR%\hctcopy.cmd %DXIL_DLL_LOC% %TEST_DIR% dxil.dll
   if errorlevel 1 exit /b 1
+) else (
+  rem If we're not requiring a dxil.dll, most expectations will be that it not be there
+  if exist "%TEST_DIR%\dxil.dll" (
+    echo Deleting DXIL.dll from %TEST_DIR%
+    del "%TEST_DIR%\dxil.dll"
+  )
 )
 
 rem Begin SPIRV change
@@ -419,6 +432,19 @@ if "%TEST_CLANG%"=="1" (
 
   call :runte ClangHLSLTests.dll /p:"HlslDataDir=%HLSL_SRC_DIR%\tools\clang\test\HLSL" !SELECT_FILTER! %ADDITIONAL_OPTS%
   set RES_CLANG=!ERRORLEVEL!
+)
+
+if "%TEST_DXILLIB%"=="1" (
+  if not defined DXIL_DLL_LOC (
+    copy %BIN_DIR%\testdxil.dll %TEST_DIR%\dxil.dll
+
+    echo Running dxil lib validation tests ...
+    set SELECT_FILTER= /select:"@Name='VerifierTest::*' AND @Architecture='%TEST_ARCH%'"
+    set DXIL_OPT= /p:LoadExternalDxil=1
+    call :runte ClangHLSLTests.dll /p:"HlslDataDir=%HLSL_SRC_DIR%\tools\clang\test\HLSL" !SELECT_FILTER! %ADDITIONAL_OPTS% %DXIL_OPT%
+    set RES_DXILLIB=!ERRORLEVEL!
+    del %TEST_DIR%\dxil.dll
+  )
 )
 
 
@@ -495,6 +521,7 @@ if "%TEST_EXEC%"=="1" (
 call :check_result "hcttest-extras tests" %RES_EXTRAS%
 call :check_result "hcttest-after script" %RES_HCTTEST_AFTER%
 call :check_result "dxilconv tests" %RES_DXILCONV%
+call :check_result "dxillib tests" %RES_DXILLIB%
 
 set EXIT_CODE=%TESTS_FAILED%
 if not "%TESTS_PASSED%"=="0" (
