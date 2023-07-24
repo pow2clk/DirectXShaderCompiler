@@ -88,11 +88,6 @@ public:
     /// \@catch statement.
     AtCatchScope = 0x400,
     
-    // HLSL Change Starts
-    // Overloaded with AtCatchScope because this is HLSL-specific.
-    ForDeclScope = 0x400,
-    // HLSL Change Ends
-    
     /// \brief This scope corresponds to an Objective-C method body.
     /// It always has FnScope and DeclScope set as well.
     ObjCMethodScope = 0x800,
@@ -106,6 +101,11 @@ public:
     /// \brief This is the scope for a function-level C++ try or catch scope.
     FnTryCatchScope = 0x4000,
 
+    // HLSL Change Starts
+    // Overloaded with FnTryCatchScope because this is HLSL-specific and works similarly
+    ForDeclScope = 0x4000,
+    // HLSL Change Ends
+    
     /// \brief This is the scope of OpenMP executable directive.
     OpenMPDirectiveScope = 0x8000,
 
