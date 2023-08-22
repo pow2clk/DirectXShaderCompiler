@@ -2811,7 +2811,7 @@ NodeIOProperties DxilMDHelper::LoadDxilNodeIOState(const llvm::MDOperand &MDO) {
       MDTuple *pTupleMD = cast<MDTuple>(MDO.get());
       Node.RecordType.size = ConstMDToUint32(pTupleMD->getOperand(1));
       if (pTupleMD->getNumOperands() > 2) {
-        DXASSERT(pTupleMD->getNumOperands() == 4,
+        DXASSERT(pTupleMD->getNumOperands() == 4, // relies too heavily on locations, doesn't error for too many operands
                  "incorrect number of operands");
         MDTuple *pSVDTupleMD = cast<MDTuple>(pTupleMD->getOperand(3));
         Node.RecordType.SV_DispatchGrid.ByteOffset =
