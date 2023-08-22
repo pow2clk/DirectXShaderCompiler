@@ -2663,6 +2663,7 @@ NodeIOProperties DxilMDHelper::LoadDxilNodeIOState(const llvm::MDOperand &MDO) {
     } break;
     default:
       DXASSERT(false, "Unknown NodeIO properties tag");
+      m_bExtraMetadata = true;
       break;
     }
   }
