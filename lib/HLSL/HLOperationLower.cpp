@@ -9042,7 +9042,6 @@ void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
     }
   }
 }
-} // namespace
 
 void TranslateHLSubscript(CallInst *CI, HLSubscriptOpcode opcode,
                           HLOperationLowerHelper &helper,
@@ -9215,6 +9214,7 @@ void TranslateSubscriptOperation(Function *F, HLOperationLowerHelper &helper,
   }
 }
 
+} // namespace
 // Create BitCast if ptr, otherwise, create alloca of new type, write to bitcast
 // of alloca, and return load from alloca If bOrigAllocaTy is true: create
 // alloca of old type instead, write to alloca, and return load from bitcast of
