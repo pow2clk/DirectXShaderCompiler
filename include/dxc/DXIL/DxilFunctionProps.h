@@ -151,6 +151,9 @@ struct DxilFunctionProps {
     return shaderKind == DXIL::ShaderKind::Node ||
            Node.LaunchType != DXIL::NodeLaunchType::Invalid;
   };
+  // Returns if the shader stage is compute-like, which is basically
+  // determined by whether it allows specifying a thread shape with numthreads
+  bool IsComputeLike() const { return IsCS() || IsAS() || IsMS() || IsNode(); }
 };
 
 } // namespace hlsl

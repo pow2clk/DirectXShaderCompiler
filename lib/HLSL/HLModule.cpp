@@ -355,18 +355,10 @@ void HLModule::SetPatchConstantFunctionForHS(
   if (patchConstantFunc)
     m_PatchConstantFunctions.insert(patchConstantFunc);
 }
-bool HLModule::IsGraphicsShader(llvm::Function *F) {
-  return HasDxilFunctionProps(F) && GetDxilFunctionProps(F).IsGraphics();
-}
 bool HLModule::IsPatchConstantShader(llvm::Function *F) {
   return m_PatchConstantFunctions.count(F) != 0;
 }
-bool HLModule::IsComputeShader(llvm::Function *F) {
-  return HasDxilFunctionProps(F) && GetDxilFunctionProps(F).IsCS();
-}
-bool HLModule::IsNodeShader(llvm::Function *F) {
-  return HasDxilFunctionProps(F) && GetDxilFunctionProps(F).IsNode();
-}
+// Rename. Actually used to determine if we are dealing with library targets
 bool HLModule::IsEntryThatUsesSignatures(llvm::Function *F) {
   auto propIter = m_DxilFunctionPropsMap.find(F);
   if (propIter != m_DxilFunctionPropsMap.end()) {

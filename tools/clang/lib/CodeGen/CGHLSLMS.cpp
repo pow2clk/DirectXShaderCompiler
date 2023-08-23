@@ -1685,10 +1685,10 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
     funcProps->numThreads[1] = Attr->getY();
     funcProps->numThreads[2] = Attr->getZ();
 
-    if (isEntry && !SM->IsCS() && !SM->IsMS() && !SM->IsAS()) {
+    if (isEntry && !SM->IsComputeLike()) {
       unsigned DiagID = Diags.getCustomDiagID(
           DiagnosticsEngine::Error,
-          "attribute numthreads only valid for CS/MS/AS.");
+            "attribute numthreads only valid for compute-like profiles.");
       Diags.Report(Attr->getLocation(), DiagID);
       return;
     }

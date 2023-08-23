@@ -376,8 +376,8 @@ void DxilModule::CollectShaderFlagsForModule() {
 
 void DxilModule::SetNumThreads(unsigned x, unsigned y, unsigned z) {
   DXASSERT(m_DxilEntryPropsMap.size() == 1 &&
-               (m_pSM->IsCS() || m_pSM->IsMS() || m_pSM->IsAS()),
-           "only works for CS/MS/AS profiles");
+           m_pSM->IsComputeLike(),
+           "numthreads only valid for compute-like profiles");
   DxilFunctionProps &props = m_DxilEntryPropsMap.begin()->second->props;
   DXASSERT_NOMSG(m_pSM->GetKind() == props.shaderKind);
   props.numThreads[0] = x;
@@ -386,11 +386,11 @@ void DxilModule::SetNumThreads(unsigned x, unsigned y, unsigned z) {
 }
 unsigned DxilModule::GetNumThreads(unsigned idx) const {
   DXASSERT(m_DxilEntryPropsMap.size() == 1 &&
-               (m_pSM->IsCS() || m_pSM->IsMS() || m_pSM->IsAS()),
-           "only works for CS/MS/AS profiles");
+           m_pSM->IsComputeLike(),
+           "numthreads only valid for compute-like profiles");
   DXASSERT(idx < 3, "Thread dimension index must be 0-2");
   assert(idx < 3);
-  if (!(m_pSM->IsCS() || m_pSM->IsMS() || m_pSM->IsAS()))
+  if (!m_pSM->IsComputeLike())
     return 0;
   const DxilFunctionProps &props = m_DxilEntryPropsMap.begin()->second->props;
   DXASSERT_NOMSG(m_pSM->GetKind() == props.shaderKind);
@@ -398,17 +398,17 @@ unsigned DxilModule::GetNumThreads(unsigned idx) const {
 }
 
 void DxilModule::SetWaveSize(unsigned size) {
-  DXASSERT(m_DxilEntryPropsMap.size() == 1 && m_pSM->IsCS(),
-           "only works for CS profile");
+  DXASSERT(m_DxilEntryPropsMap.size() == 1 && m_pSM->IsCS(), // how do we allow nodes here?
+    "only works for CS/Node profile");
   DxilFunctionProps &props = m_DxilEntryPropsMap.begin()->second->props;
   DXASSERT_NOMSG(m_pSM->GetKind() == props.shaderKind);
   props.waveSize = size;
 }
 
 unsigned DxilModule::GetWaveSize() const {
-  DXASSERT(m_DxilEntryPropsMap.size() == 1 && m_pSM->IsCS(),
-           "only works for CS profiles");
-  if (!m_pSM->IsCS())
+  DXASSERT(m_DxilEntryPropsMap.size() == 1 && m_pSM->IsCS(), // how do we allow nodes here?
+    "only works for CS/Node profiles");
+  if (!m_pSM->IsCS()) // how do we allow nodes here?
     return 0;
   const DxilFunctionProps &props = m_DxilEntryPropsMap.begin()->second->props;
   DXASSERT_NOMSG(m_pSM->GetKind() == props.shaderKind);
@@ -1218,20 +1218,16 @@ void DxilModule::SetPatchConstantFunctionForHS(
       m_PatchConstantFunctions.insert(patchConstantFunc);
   }
 }
-bool DxilModule::IsGraphicsShader(const llvm::Function *F) const {
-  return HasDxilFunctionProps(F) && GetDxilFunctionProps(F).IsGraphics();
-}
 bool DxilModule::IsPatchConstantShader(const llvm::Function *F) const {
   return m_PatchConstantFunctions.count(F) != 0;
 }
-bool DxilModule::IsComputeShader(const llvm::Function *F) const {
-  return HasDxilFunctionProps(F) && GetDxilFunctionProps(F).IsCS();
-}
+
+// rename. misleading. gates stripping of actual parameters when changing them to intrinsics
 bool DxilModule::IsEntryThatUsesSignatures(const llvm::Function *F) const {
   auto propIter = m_DxilEntryPropsMap.find(F);
   if (propIter != m_DxilEntryPropsMap.end()) {
     DxilFunctionProps &props = propIter->second->props;
-    return props.IsGraphics() || props.IsCS() || props.IsNode();
+    return props.IsGraphics() || props.IsComputeLike();
   }
   // Otherwise, return true if patch constant function
   return IsPatchConstantShader(F);
@@ -1420,8 +1416,8 @@ void DxilModule::EmitDxilMetadata() {
   if (pMDResources)
     m_pMDHelper->EmitDxilResources(pMDResources);
   m_pMDHelper->EmitDxilTypeSystem(GetTypeSystem(), m_LLVMUsed);
-  if (!m_pSM->IsLib() && !m_pSM->IsCS() &&
-      ((m_ValMajor == 0 && m_ValMinor == 0) ||
+  if (!m_pSM->IsLib() && !m_pSM->IsComputeLike() &&
+      ((m_ValMajor == 0 &&  m_ValMinor == 0) ||
        (m_ValMajor > 1 || (m_ValMajor == 1 && m_ValMinor >= 1)))) {
     m_pMDHelper->EmitDxilViewIdState(m_SerializedState);
   }

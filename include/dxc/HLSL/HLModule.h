@@ -152,10 +152,7 @@ public:
                             std::unique_ptr<DxilFunctionProps> &info);
   void SetPatchConstantFunctionForHS(llvm::Function *hullShaderFunc,
                                      llvm::Function *patchConstantFunc);
-  bool IsGraphicsShader(llvm::Function *F); // vs,hs,ds,gs,ps
   bool IsPatchConstantShader(llvm::Function *F);
-  bool IsComputeShader(llvm::Function *F);
-  bool IsNodeShader(llvm::Function *F);
 
   // Is an entry function that uses input/output signature conventions?
   // Includes: vs/hs/ds/gs/ps/cs as well as the patch constant function.

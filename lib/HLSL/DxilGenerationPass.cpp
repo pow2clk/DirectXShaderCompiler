@@ -231,9 +231,7 @@ public:
           std::unique_ptr<DxilEntryProps> pProps =
               llvm::make_unique<DxilEntryProps>(
                   props, m_pHLModule->GetHLOptions().bUseMinPrecision);
-          if (m_pHLModule->IsGraphicsShader(&F) ||
-              m_pHLModule->IsComputeShader(&F) ||
-              m_pHLModule->IsNodeShader(&F)) {
+          if (props.IsGraphics() || props.IsCS()) { // I think that's right?
             HLSignatureLower sigLower(&F, *m_pHLModule, pProps->sig);
             // TODO: BUG: This will lower patch constant function sigs twice if
             // used by two hull shaders!

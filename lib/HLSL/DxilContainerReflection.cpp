@@ -2741,9 +2741,7 @@ DxilShaderReflection::GetMinFeatureLevel(D3D_FEATURE_LEVEL *pLevel) noexcept {
 
 UINT DxilShaderReflection::GetThreadGroupSize(UINT *pSizeX, UINT *pSizeY,
                                               UINT *pSizeZ) noexcept {
-  if (!m_pDxilModule->GetShaderModel()->IsCS() &&
-      !m_pDxilModule->GetShaderModel()->IsMS() &&
-      !m_pDxilModule->GetShaderModel()->IsAS()) {
+  if (!m_pDxilModule->GetShaderModel()->IsComputeLike()) {
     AssignToOutOpt((UINT)0, pSizeX);
     AssignToOutOpt((UINT)0, pSizeY);
     AssignToOutOpt((UINT)0, pSizeZ);
