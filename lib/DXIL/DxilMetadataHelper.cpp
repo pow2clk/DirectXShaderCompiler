@@ -1743,8 +1743,8 @@ void DxilMDHelper::LoadDxilEntryProperties(const MDOperand &MDO,
     } break;
 
     case DxilMDHelper::kDxilNumThreadsTag: {
-      DXASSERT(props.IsCS() || props.shaderKind == DXIL::ShaderKind::Node,
-               "else invalid shader kind");
+      DXASSERT(props.IsComputeLike(),
+               "else invalid shader kind for numthreads tag");
       MDNode *pNode = cast<MDNode>(MDO.get());
       props.numThreads[0] = ConstMDToUint32(pNode->getOperand(0));
       props.numThreads[1] = ConstMDToUint32(pNode->getOperand(1));
@@ -1821,7 +1821,8 @@ void DxilMDHelper::LoadDxilEntryProperties(const MDOperand &MDO,
       LoadDxilASState(MDO, props.numThreads, AS.payloadSizeInBytes);
     } break;
     case DxilMDHelper::kDxilWaveSizeTag: {
-      DXASSERT(props.IsCS() || props.IsNode(), "else invalid shader kind");
+      DXASSERT(props.IsComputeLike(),
+               "else invalid shader kind for wavesize tag");
       MDNode *pNode = cast<MDNode>(MDO.get());
       props.waveSize = ConstMDToUint32(pNode->getOperand(0));
     } break;

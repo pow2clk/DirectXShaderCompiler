@@ -971,7 +971,7 @@ public:
   void print(raw_ostream &o, const Module *M) const override {
     DxilModule &DxilModule = M->GetDxilModule();
     const ShaderModel *pSM = DxilModule.GetShaderModel();
-    if (pSM->IsCS() || pSM->IsLib())
+    if (pSM->IsComputeLike() || pSM->IsLib())
       return;
 
     auto &SerializedViewIdState = DxilModule.GetSerializedViewIdState();
@@ -995,7 +995,7 @@ ComputeViewIdState::ComputeViewIdState() : ModulePass(ID) {}
 bool ComputeViewIdState::runOnModule(Module &M) {
   DxilModule &DxilModule = M.GetOrCreateDxilModule();
   const ShaderModel *pSM = DxilModule.GetShaderModel();
-  if (!pSM->IsCS() && !pSM->IsLib()) {
+  if (!pSM->IsComputeLike() && !pSM->IsLib()) {
     DxilViewIdState ViewIdState(&DxilModule);
     DxilViewIdStateBuilder Builder(ViewIdState, &DxilModule);
     Builder.Compute();

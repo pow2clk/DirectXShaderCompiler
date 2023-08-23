@@ -146,9 +146,7 @@ public:
   // Move DxilFunctionProps of F to NewF.
   void SetPatchConstantFunctionForHS(llvm::Function *hullShaderFunc,
                                      llvm::Function *patchConstantFunc);
-  bool IsGraphicsShader(const llvm::Function *F) const; // vs,hs,ds,gs,ps
   bool IsPatchConstantShader(const llvm::Function *F) const;
-  bool IsComputeShader(const llvm::Function *F) const;
 
   // Is an entry function that uses input/output signature conventions?
   // Includes: vs/hs/ds/gs/ps/cs as well as the patch constant function.

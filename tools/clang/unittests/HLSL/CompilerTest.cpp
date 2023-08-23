@@ -3681,7 +3681,7 @@ TEST_F(CompilerTest, CompileWhenShaderModelMismatchAttributeThenFail) {
                                       nullptr, &pResult));
   std::string failLog(VerifyOperationFailed(pResult));
   VERIFY_ARE_NOT_EQUAL(string::npos,
-                       failLog.find("attribute numthreads only valid for CS"));
+                       failLog.find("attribute numthreads only valid for compute-like profiles"));
 }
 
 TEST_F(CompilerTest, CompileBadHlslThenFail) {

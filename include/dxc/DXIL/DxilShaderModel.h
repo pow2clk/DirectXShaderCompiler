@@ -49,6 +49,7 @@ public:
   }
   bool IsMS() const { return m_Kind == Kind::Mesh; }
   bool IsAS() const { return m_Kind == Kind::Amplification; }
+  bool IsComputeLike() const { return IsCS() || IsMS() || IsAS(); }
   bool IsValid() const;
   bool IsValidForDxil() const;
   bool IsValidForModule() const;

@@ -3724,7 +3724,7 @@ static void ValidateGlobalVariables(ValidationContext &ValCtx) {
   DxilModule &M = ValCtx.DxilMod;
 
   const ShaderModel *pSM = ValCtx.DxilMod.GetShaderModel();
-  bool TGSMAllowed = pSM->IsCS() || pSM->IsAS() || pSM->IsMS() || pSM->IsLib();
+  bool TGSMAllowed = pSM->IsComputeLike() || pSM->IsLib();
 
   unsigned TGSMSize = 0;
   std::vector<StoreInst *> fixAddrTGSMList;
@@ -3743,11 +3743,10 @@ static void ValidateGlobalVariables(ValidationContext &ValCtx) {
             llvm::Function *F = I->getParent()->getParent();
             if (M.HasDxilEntryProps(F)) {
               DxilFunctionProps &props = M.GetDxilEntryProps(F).props;
-              if (!props.IsCS() && !props.IsAS() && !props.IsMS() &&
-                  !props.IsNode()) {
+              if (!props.IsComputeLike()) {
                 ValCtx.EmitInstrFormatError(I,
                                             ValidationRule::SmTGSMUnsupported,
-                                            {"from non-compute entry points"});
+                                            { "from non-compute entry points" });
               }
             }
           }
