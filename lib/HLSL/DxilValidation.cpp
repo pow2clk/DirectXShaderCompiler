@@ -3556,7 +3556,7 @@ static void ValidateFunction(Function &F, ValidationContext &ValCtx) {
       }
     }
 
-    if (numArgs < numUDTShaderArgs && shaderKind != DXIL::ShaderKind::Node) {
+    if (numArgs < numUDTShaderArgs) {
       StringRef argType[2] = {
           shaderKind == DXIL::ShaderKind::Callable ? "params" : "payload",
           "attributes"};
