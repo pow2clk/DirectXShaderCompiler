@@ -67,7 +67,7 @@ void node001_dispatchgrid_shader(DispatchNodeInputRecord<INPUT_NOGRID> input)
 // NodeInputs
 // Arg #1: NodeIOKind Tag (1)
 // Arg #2: InputRecord(97)
-// Arg #3: NodeRecordType Tag (3)
+// Arg #3: NodeRecordType Tag (2)
 // Arg #4: INPUT_NOGRID type
 // ------------------------------------------------------------------
 // CHECK: [[NODE_IN]] = !{[[INPUT0:![0-9]+]]}

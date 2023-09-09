@@ -62,9 +62,9 @@ void node014_getrecordcount([MaxRecords(256)] GroupNodeInputRecords<INPUT_RECORD
 // NodeInputs
 // Arg #1: NodeIOKind Tag (1)
 // Arg #2: InputRecord (65)
-// Arg #3: NodeInputMaxArraySize Tag (2)
+// Arg #3: NodeInputMaxArraySize Tag (2) // this is also probably wrong see 8f2c4ddb1e30c
 // Arg #4: 256
-// Arg #5: NodeRecordType Tag (3)
+// Arg #5: NodeRecordType Tag (3) // this is wrong 
 // Arg #6: INPUT_RECORD Type
 // ------------------------------------------------------------------
 // CHECK-DAG: [[NODE_IN]] = !{[[INPUT0:![0-9]+]]}
