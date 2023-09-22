@@ -98,6 +98,11 @@ if errorlevel 1 (
   call :findgit
 )
 
+where clang-format.exe 1>nul 2>nul
+if errorlevel 1 (
+  call :findclfmt
+)
+
 pushd %HLSL_SRC_DIR%
 
 goto :eof
@@ -136,6 +141,29 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Path adjusted to include cmake.
+goto :eof
+
+:findclfmt
+for %%e in (Community Professional Enterprise) do (
+  rem check VS 2022 in programfiles first
+  if exist "%programfiles%\Microsoft Visual Studio\2022\%%e\VC\Tools\Llvm\bin" (
+    set "PATH=%PATH%;%programfiles%\Microsoft Visual Studio\2022\%%e\VC\Tools\Llvm\bin"
+    echo Path adjusted to include clang-format from Visual Studio 2022 %%e.
+    exit /b 0
+  )
+  rem then check VS 2019 in programfiles(x86)
+  if exist "%programfiles%\Microsoft Visual Studio\2019\%%e\VC\Tools\Llvm\bin" (
+    set "PATH=%PATH%;%programfiles%\Microsoft Visual Studio\2019\%%e\VC\Tools\Llvm\bin"
+    echo Path adjusted to include clang-format from Visual Studio 2019 %%e.
+    exit /b 0
+  )
+)
+where clang-format.exe 1>nul 2>nul
+if errorlevel 1 (
+  echo Unable to find clang-format on path - you will have to add this to submit properly formatted code
+  exit /b 1
+)
+echo Path adjusted to include clang-format
 goto :eof
 
 :findminte 
