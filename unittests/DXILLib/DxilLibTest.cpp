@@ -59,20 +59,20 @@ void CompileSomething(dxc::DxcDllSupport &compilerLib,
   CComPtr<IDxcLibrary> library;
   CComPtr<IDxcOperationResult> result;
   const char *source = "float4 main() : SV_Target { return 1; }";
-  EXPECT_TRUE(
+  ASSERT_TRUE(
       SUCCEEDED(compilerLib.CreateInstance(CLSID_DxcCompiler, &compiler)));
-  EXPECT_TRUE(
+  ASSERT_TRUE(
       SUCCEEDED(compilerLib.CreateInstance(CLSID_DxcLibrary, &library)));
 
   CComPtr<IDxcBlobEncoding> sourceBlob;
   IFT(library->CreateBlobWithEncodingOnHeapCopy(source, strlen(source), CP_UTF8,
                                                 &sourceBlob));
 
-  compiler->Compile(sourceBlob, L"hlsl.hlsl", L"main", L"ps_6_0", nullptr, 0,
-                    nullptr, 0, nullptr, &result);
+  ASSERT_TRUE(SUCCEEDED(compiler->Compile(sourceBlob, L"hlsl.hlsl", L"main", L"ps_6_0", nullptr, 0,
+					  nullptr, 0, nullptr, &result)));
   HRESULT status;
-  EXPECT_TRUE(SUCCEEDED(result->GetStatus(&status)));
-  EXPECT_TRUE(SUCCEEDED(status));
+  ASSERT_TRUE(SUCCEEDED(result->GetStatus(&status)));
+  ASSERT_TRUE(SUCCEEDED(status));
   *outResult = result.Detach();
 }
 
@@ -82,16 +82,16 @@ void CompileSomething(dxc::DxcDllSupport &compilerLib,
 TEST(DxilLibTest, LoadFromCompiler) {
 
   dxc::DxcDllSupport compilerLib;
-  EXPECT_TRUE(SUCCEEDED(compilerLib.Initialize()));
+  ASSERT_TRUE(SUCCEEDED(compilerLib.Initialize()));
 
   // Compile trivial, valid shader and check for warnings
   CComPtr<IDxcOperationResult> result;
   CompileSomething(compilerLib, &result);
 
   CComPtr<IDxcBlobEncoding> errBuf;
-  EXPECT_TRUE(SUCCEEDED(result->GetErrorBuffer(&errBuf)));
+  ASSERT_TRUE(SUCCEEDED(result->GetErrorBuffer(&errBuf)));
 
-  EXPECT_EQ(errBuf->GetBufferSize(), 0U);
+  EXPECT_EQ(errBuf->GetBufferSize(), 0U) << "Unexpected warning found in error buffer";
 }
 
 // Check that dxil lib can be loaded and trivially used by a validator object
@@ -101,41 +101,41 @@ TEST(DxilLibTest, LoadFromValidator) {
   dxc::DxcDllSupport validatorLib;
   CComPtr<IDxcValidator> validator1;
   CComPtr<IDxcValidator> validator2;
-  EXPECT_TRUE(SUCCEEDED(
-      validatorLib.InitializeForDll(dxc::kDxilLib, "DxcCreateInstance")));
+  ASSERT_TRUE(SUCCEEDED(
+			validatorLib.InitializeForDll(dxc::kDxilLib, "DxcCreateInstance"))) << "Couldn't find " << dxc::kDxilLib;
   EXPECT_TRUE(validatorLib.HasCreateWithMalloc());
-  EXPECT_TRUE(
+  ASSERT_TRUE(
       SUCCEEDED(validatorLib.CreateInstance(CLSID_DxcValidator, &validator1)));
 
   HeapMalloc allocator;
-  EXPECT_TRUE(SUCCEEDED(validatorLib.CreateInstance2(
+  ASSERT_TRUE(SUCCEEDED(validatorLib.CreateInstance2(
       &allocator, CLSID_DxcValidator, &validator2)));
 
   // Create a simple compiled output to validate
   dxc::DxcDllSupport compilerLib;
-  EXPECT_TRUE(SUCCEEDED(compilerLib.Initialize()));
+  ASSERT_TRUE(SUCCEEDED(compilerLib.Initialize()));
   CComPtr<IDxcOperationResult> compileResult;
   CompileSomething(compilerLib, &compileResult);
   CComPtr<IDxcBlob> blob;
-  EXPECT_TRUE(SUCCEEDED(compileResult->GetResult(&blob)));
+  ASSERT_TRUE(SUCCEEDED(compileResult->GetResult(&blob)));
 
   CComPtr<IDxcOperationResult> validationResult1;
   HRESULT status1;
   CComPtr<IDxcBlobEncoding> errBuf1;
-  EXPECT_TRUE(SUCCEEDED(validator1->Validate(blob, DxcValidatorFlags_Default,
+  ASSERT_TRUE(SUCCEEDED(validator1->Validate(blob, DxcValidatorFlags_Default,
                                              &validationResult1)));
-  EXPECT_TRUE(SUCCEEDED(validationResult1->GetStatus(&status1)));
+  ASSERT_TRUE(SUCCEEDED(validationResult1->GetStatus(&status1)));
   EXPECT_TRUE(SUCCEEDED(status1));
-  EXPECT_TRUE(SUCCEEDED(validationResult1->GetErrorBuffer(&errBuf1)));
+  ASSERT_TRUE(SUCCEEDED(validationResult1->GetErrorBuffer(&errBuf1)));
   EXPECT_EQ(errBuf1->GetBufferSize(), 0U);
 
   CComPtr<IDxcOperationResult> validationResult2;
   HRESULT status2;
   CComPtr<IDxcBlobEncoding> errBuf2;
-  EXPECT_TRUE(SUCCEEDED(validator2->Validate(blob, DxcValidatorFlags_Default,
+  ASSERT_TRUE(SUCCEEDED(validator2->Validate(blob, DxcValidatorFlags_Default,
                                              &validationResult2)));
-  EXPECT_TRUE(SUCCEEDED(validationResult2->GetStatus(&status2)));
+  ASSERT_TRUE(SUCCEEDED(validationResult2->GetStatus(&status2)));
   EXPECT_TRUE(SUCCEEDED(status2));
-  EXPECT_TRUE(SUCCEEDED(validationResult2->GetErrorBuffer(&errBuf2)));
+  ASSERT_TRUE(SUCCEEDED(validationResult2->GetErrorBuffer(&errBuf2)));
   EXPECT_EQ(errBuf2->GetBufferSize(), 0U);
 }
