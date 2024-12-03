@@ -203,6 +203,15 @@ const OP::OpCodeProperty OP::m_OpCodeProps[(unsigned)OP::OpCode::NumOpCodes] = {
         Attribute::ReadNone,
     },
     {
+        OC::Atan,
+        "Atan",
+        OCC::Unary,
+        "unary",
+        {false, true, true, false, false, false, false, false, false, false,
+         false, true},
+        Attribute::ReadNone,
+    },
+    {
         OC::Hcos,
         "Hcos",
         OCC::Unary,
@@ -221,12 +230,39 @@ const OP::OpCodeProperty OP::m_OpCodeProps[(unsigned)OP::OpCode::NumOpCodes] = {
         Attribute::ReadNone,
     },
     {
+        OC::Htan,
+        "Htan",
+        OCC::Unary,
+        "unary",
+        {false, true, true, false, false, false, false, false, false, false,
+         false, true},
+        Attribute::ReadNone,
+    },
+    {
+        OC::Exp,
+        "Exp",
+        OCC::Unary,
+        "unary",
+        {false, true, true, false, false, false, false, false, false, false,
+         false, true},
+        Attribute::ReadNone,
+    },
+    {
         OC::Frc,
         "Frc",
         OCC::Unary,
         "unary",
         {false, true, true, false, false, false, false, false, false, false,
          false, false},
+        Attribute::ReadNone,
+    },
+    {
+        OC::Log,
+        "Log",
+        OCC::Unary,
+        "unary",
+        {false, true, true, false, false, false, false, false, false, false,
+         false, true},
         Attribute::ReadNone,
     },
     {
@@ -284,45 +320,6 @@ const OP::OpCodeProperty OP::m_OpCodeProps[(unsigned)OP::OpCode::NumOpCodes] = {
         "unary",
         {false, true, true, false, false, false, false, false, false, false,
          false, false},
-        Attribute::ReadNone,
-    },
-
-    // Unary float void,     h,     f,     d,    i1,    i8,   i16,   i32,   i64,
-    // udt,   obj,   vec,  function attribute
-    {
-        OC::Atan,
-        "Atan",
-        OCC::Unary,
-        "unary",
-        {false, true, true, false, false, false, false, false, false, false,
-         false, true},
-        Attribute::ReadNone,
-    },
-    {
-        OC::Htan,
-        "Htan",
-        OCC::Unary,
-        "unary",
-        {false, true, true, false, false, false, false, false, false, false,
-         false, true},
-        Attribute::ReadNone,
-    },
-    {
-        OC::Exp,
-        "Exp",
-        OCC::Unary,
-        "unary",
-        {false, true, true, false, false, false, false, false, false, false,
-         false, true},
-        Attribute::ReadNone,
-    },
-    {
-        OC::Log,
-        "Log",
-        OCC::Unary,
-        "unary",
-        {false, true, true, false, false, false, false, false, false, false,
-         false, true},
         Attribute::ReadNone,
     },
 
@@ -3717,6 +3714,11 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(pI32);
     A(pETy);
     break;
+  case OpCode::Atan:
+    A(pETy);
+    A(pI32);
+    A(pETy);
+    break;
   case OpCode::Hcos:
     A(pETy);
     A(pI32);
@@ -3727,7 +3729,22 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(pI32);
     A(pETy);
     break;
+  case OpCode::Htan:
+    A(pETy);
+    A(pI32);
+    A(pETy);
+    break;
+  case OpCode::Exp:
+    A(pETy);
+    A(pI32);
+    A(pETy);
+    break;
   case OpCode::Frc:
+    A(pETy);
+    A(pI32);
+    A(pETy);
+    break;
+  case OpCode::Log:
     A(pETy);
     A(pI32);
     A(pETy);
@@ -3760,28 +3777,6 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(pETy);
     break;
   case OpCode::Round_z:
-    A(pETy);
-    A(pI32);
-    A(pETy);
-    break;
-
-    // Unary float
-  case OpCode::Atan:
-    A(pETy);
-    A(pI32);
-    A(pETy);
-    break;
-  case OpCode::Htan:
-    A(pETy);
-    A(pI32);
-    A(pETy);
-    break;
-  case OpCode::Exp:
-    A(pETy);
-    A(pI32);
-    A(pETy);
-    break;
-  case OpCode::Log:
     A(pETy);
     A(pI32);
     A(pETy);
