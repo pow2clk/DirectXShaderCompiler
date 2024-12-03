@@ -10,6 +10,8 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
+#include "dxc/DXIL/DxilModule.h"
+
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
@@ -150,6 +152,11 @@ bool DxilEliminateVector::TryRewriteDebugInfoForVector(InsertElementInst *IE) {
 }
 
 bool DxilEliminateVector::runOnFunction(Function &F) {
+
+  const hlsl::ShaderModel *SM = F.getParent()->HasDxilModule()? F.getParent()->GetDxilModule().GetShaderModel(): nullptr;
+  if (SM && SM->IsSM69Plus()) {
+    return false;
+  }
 
   auto *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   DxilValueCache *DVC = &getAnalysis<DxilValueCache>();
