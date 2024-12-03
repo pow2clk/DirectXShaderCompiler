@@ -1368,7 +1368,7 @@ class db_dxil(object):
             next_op_idx += 1
         for (
             i
-        ) in "Cos,Sin,Tan,Acos,Asin,Atan,Hcos,Hsin,Htan,Exp,Frc,Log,Sqrt,Rsqrt,Round_ne,Round_ni,Round_pi,Round_z".split(
+        ) in "Cos,Sin,Tan,Acos,Asin,Hcos,Hsin,Frc,Sqrt,Rsqrt,Round_ne,Round_ni,Round_pi,Round_z".split(
             ","
         ):
             self.add_dxil_op(
@@ -1377,6 +1377,26 @@ class db_dxil(object):
                 "Unary",
                 "returns the " + i,
                 "hf",
+                "rn",
+                [
+                    db_dxil_param(0, "$o", "", "operation result"),
+                    db_dxil_param(2, "$o", "value", "input value"),
+                ],
+                counters=("floats",),
+            )
+            next_op_idx += 1
+
+        for (
+            i
+        ) in "Atan,Htan,Exp,Log".split(
+            ","
+        ):
+            self.add_dxil_op(
+                i,
+                next_op_idx,
+                "Unary",
+                "returns the " + i,
+                "hft",
                 "rn",
                 [
                     db_dxil_param(0, "$o", "", "operation result"),
@@ -1440,7 +1460,7 @@ class db_dxil(object):
                 next_op_idx,
                 "Binary",
                 "returns the " + i + " of the input values",
-                "hfd",
+                "hfdt",
                 "rn",
                 [
                     db_dxil_param(0, "$o", "", "operation result"),
@@ -1458,7 +1478,7 @@ class db_dxil(object):
                 next_op_idx,
                 "Binary",
                 "returns the " + i + " of the input values",
-                "wil",
+                "wilt",
                 "rn",
                 [
                     db_dxil_param(0, "$o", "", "operation result"),
@@ -1530,7 +1550,7 @@ class db_dxil(object):
             next_op_idx,
             "Tertiary",
             "performs a fused multiply add (FMA) of the form a * b + c",
-            "d",
+            "dt",
             "rn",
             [
                 db_dxil_param(

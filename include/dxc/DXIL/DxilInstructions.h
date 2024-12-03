@@ -1189,33 +1189,6 @@ struct DxilInst_Asin {
   void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
 };
 
-/// This instruction Returns the arctangent of the specified value. The return
-/// value is within the range of -PI/2 to PI/2.
-struct DxilInst_Atan {
-  llvm::Instruction *Instr;
-  // Construction and identification
-  DxilInst_Atan(llvm::Instruction *pInstr) : Instr(pInstr) {}
-  operator bool() const {
-    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Atan);
-  }
-  // Validation support
-  bool isAllowed() const { return true; }
-  bool isArgumentListValid() const {
-    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
-      return false;
-    return true;
-  }
-  // Metadata
-  bool requiresUniformInputs() const { return false; }
-  // Operand indexes
-  enum OperandIdx {
-    arg_value = 1,
-  };
-  // Accessors
-  llvm::Value *get_value() const { return Instr->getOperand(1); }
-  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
-};
-
 /// This instruction returns the hyperbolic cosine of the specified value.
 struct DxilInst_Hcos {
   llvm::Instruction *Instr;
@@ -1268,58 +1241,6 @@ struct DxilInst_Hsin {
   void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
 };
 
-/// This instruction returns the hyperbolic tangent of the specified value.
-struct DxilInst_Htan {
-  llvm::Instruction *Instr;
-  // Construction and identification
-  DxilInst_Htan(llvm::Instruction *pInstr) : Instr(pInstr) {}
-  operator bool() const {
-    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Htan);
-  }
-  // Validation support
-  bool isAllowed() const { return true; }
-  bool isArgumentListValid() const {
-    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
-      return false;
-    return true;
-  }
-  // Metadata
-  bool requiresUniformInputs() const { return false; }
-  // Operand indexes
-  enum OperandIdx {
-    arg_value = 1,
-  };
-  // Accessors
-  llvm::Value *get_value() const { return Instr->getOperand(1); }
-  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
-};
-
-/// This instruction returns 2^exponent
-struct DxilInst_Exp {
-  llvm::Instruction *Instr;
-  // Construction and identification
-  DxilInst_Exp(llvm::Instruction *pInstr) : Instr(pInstr) {}
-  operator bool() const {
-    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Exp);
-  }
-  // Validation support
-  bool isAllowed() const { return true; }
-  bool isArgumentListValid() const {
-    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
-      return false;
-    return true;
-  }
-  // Metadata
-  bool requiresUniformInputs() const { return false; }
-  // Operand indexes
-  enum OperandIdx {
-    arg_value = 1,
-  };
-  // Accessors
-  llvm::Value *get_value() const { return Instr->getOperand(1); }
-  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
-};
-
 /// This instruction extract fracitonal component.
 struct DxilInst_Frc {
   llvm::Instruction *Instr;
@@ -1327,32 +1248,6 @@ struct DxilInst_Frc {
   DxilInst_Frc(llvm::Instruction *pInstr) : Instr(pInstr) {}
   operator bool() const {
     return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Frc);
-  }
-  // Validation support
-  bool isAllowed() const { return true; }
-  bool isArgumentListValid() const {
-    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
-      return false;
-    return true;
-  }
-  // Metadata
-  bool requiresUniformInputs() const { return false; }
-  // Operand indexes
-  enum OperandIdx {
-    arg_value = 1,
-  };
-  // Accessors
-  llvm::Value *get_value() const { return Instr->getOperand(1); }
-  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
-};
-
-/// This instruction returns log base 2.
-struct DxilInst_Log {
-  llvm::Instruction *Instr;
-  // Construction and identification
-  DxilInst_Log(llvm::Instruction *pInstr) : Instr(pInstr) {}
-  operator bool() const {
-    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Log);
   }
   // Validation support
   bool isAllowed() const { return true; }
@@ -1509,6 +1404,111 @@ struct DxilInst_Round_z {
   DxilInst_Round_z(llvm::Instruction *pInstr) : Instr(pInstr) {}
   operator bool() const {
     return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Round_z);
+  }
+  // Validation support
+  bool isAllowed() const { return true; }
+  bool isArgumentListValid() const {
+    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
+      return false;
+    return true;
+  }
+  // Metadata
+  bool requiresUniformInputs() const { return false; }
+  // Operand indexes
+  enum OperandIdx {
+    arg_value = 1,
+  };
+  // Accessors
+  llvm::Value *get_value() const { return Instr->getOperand(1); }
+  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
+};
+
+/// This instruction Returns the arctangent of the specified value. The return
+/// value is within the range of -PI/2 to PI/2.
+struct DxilInst_Atan {
+  llvm::Instruction *Instr;
+  // Construction and identification
+  DxilInst_Atan(llvm::Instruction *pInstr) : Instr(pInstr) {}
+  operator bool() const {
+    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Atan);
+  }
+  // Validation support
+  bool isAllowed() const { return true; }
+  bool isArgumentListValid() const {
+    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
+      return false;
+    return true;
+  }
+  // Metadata
+  bool requiresUniformInputs() const { return false; }
+  // Operand indexes
+  enum OperandIdx {
+    arg_value = 1,
+  };
+  // Accessors
+  llvm::Value *get_value() const { return Instr->getOperand(1); }
+  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
+};
+
+/// This instruction returns the hyperbolic tangent of the specified value.
+struct DxilInst_Htan {
+  llvm::Instruction *Instr;
+  // Construction and identification
+  DxilInst_Htan(llvm::Instruction *pInstr) : Instr(pInstr) {}
+  operator bool() const {
+    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Htan);
+  }
+  // Validation support
+  bool isAllowed() const { return true; }
+  bool isArgumentListValid() const {
+    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
+      return false;
+    return true;
+  }
+  // Metadata
+  bool requiresUniformInputs() const { return false; }
+  // Operand indexes
+  enum OperandIdx {
+    arg_value = 1,
+  };
+  // Accessors
+  llvm::Value *get_value() const { return Instr->getOperand(1); }
+  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
+};
+
+/// This instruction returns 2^exponent
+struct DxilInst_Exp {
+  llvm::Instruction *Instr;
+  // Construction and identification
+  DxilInst_Exp(llvm::Instruction *pInstr) : Instr(pInstr) {}
+  operator bool() const {
+    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Exp);
+  }
+  // Validation support
+  bool isAllowed() const { return true; }
+  bool isArgumentListValid() const {
+    if (2 != llvm::dyn_cast<llvm::CallInst>(Instr)->getNumArgOperands())
+      return false;
+    return true;
+  }
+  // Metadata
+  bool requiresUniformInputs() const { return false; }
+  // Operand indexes
+  enum OperandIdx {
+    arg_value = 1,
+  };
+  // Accessors
+  llvm::Value *get_value() const { return Instr->getOperand(1); }
+  void set_value(llvm::Value *val) { Instr->setOperand(1, val); }
+};
+
+/// This instruction returns log base 2.
+struct DxilInst_Log {
+  llvm::Instruction *Instr;
+  // Construction and identification
+  DxilInst_Log(llvm::Instruction *pInstr) : Instr(pInstr) {}
+  operator bool() const {
+    return hlsl::OP::IsDxilOpFuncCallInst(Instr, hlsl::OP::OpCode::Log);
   }
   // Validation support
   bool isAllowed() const { return true; }
