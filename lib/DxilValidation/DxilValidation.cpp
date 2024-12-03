@@ -2002,7 +2002,7 @@ static void ValidateExternalFunction(Function *F, ValidationContext &ValCtx) {
         ValCtx.EmitInstrError(CI, ValidationRule::InstrOload);
         continue;
       }
-      dxilFunc = hlslOP->GetOpFunc(dxilOpcode, Ty->getScalarType());
+      dxilFunc = hlslOP->GetOpFunc(dxilOpcode, Ty);
     }
 
     if (!dxilFunc) {

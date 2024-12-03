@@ -890,35 +890,35 @@ enum class OpCode : unsigned {
   Ubfe = 52, // Unsigned integer bitfield extract
 
   // Unary float - rounding
-  Round_ne = 26, // floating-point round to integral float.
-  Round_ni = 27, // floating-point round to integral float.
-  Round_pi = 28, // floating-point round to integral float.
-  Round_z = 29,  // floating-point round to integral float.
+  Round_ne = 22, // floating-point round to integral float.
+  Round_ni = 23, // floating-point round to integral float.
+  Round_pi = 24, // floating-point round to integral float.
+  Round_z = 25,  // floating-point round to integral float.
 
   // Unary float
   Acos = 15, // Returns the arccosine of the specified value. Input should be a
              // floating-point value within the range of -1 to 1.
   Asin = 16, // Returns the arccosine of the specified value. Input should be a
              // floating-point value within the range of -1 to 1
-  Atan = 17, // Returns the arctangent of the specified value. The return value
+  Atan = 26, // Returns the arctangent of the specified value. The return value
              // is within the range of -PI/2 to PI/2.
   Cos = 12,  // returns cosine(theta) for theta in radians.
-  Exp = 21,  // returns 2^exponent
+  Exp = 28,  // returns 2^exponent
   FAbs = 6,  // returns the absolute value of the input value.
-  Frc = 22,  // extract fracitonal component.
-  Hcos = 18, // returns the hyperbolic cosine of the specified value.
-  Hsin = 19, // returns the hyperbolic sine of the specified value.
-  Htan = 20, // returns the hyperbolic tangent of the specified value.
+  Frc = 19,  // extract fracitonal component.
+  Hcos = 17, // returns the hyperbolic cosine of the specified value.
+  Hsin = 18, // returns the hyperbolic sine of the specified value.
+  Htan = 27, // returns the hyperbolic tangent of the specified value.
   IsFinite = 10, // Returns true if x is finite, false otherwise.
   IsInf = 9,     // Returns true if x is +INF or -INF, false otherwise.
   IsNaN = 8,     // Returns true if x is NAN or QNAN, false otherwise.
   IsNormal = 11, // returns IsNormal
-  Log = 23,      // returns log base 2.
-  Rsqrt = 25,    // returns reciprocal square root (1 / sqrt(src)
+  Log = 29,      // returns log base 2.
+  Rsqrt = 21,    // returns reciprocal square root (1 / sqrt(src)
   Saturate = 7,  // clamps the result of a single or double precision floating
                  // point value to [0.0f...1.0f]
   Sin = 13,      // returns sine(theta) for theta in radians.
-  Sqrt = 24,     // returns square root
+  Sqrt = 20,     // returns square root
   Tan = 14,      // returns tan(theta) for theta in radians.
 
   // Unary int
