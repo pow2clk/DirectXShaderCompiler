@@ -481,6 +481,26 @@ Value *TrivialDxilOperation(OP::OpCode opcode, ArrayRef<Value *> refArgs,
   return TrivialDxilOperation(opcode, refArgs, Ty, Inst->getType(), hlslOP, B);
 }
 
+Value *TrivialDxilVectorOperation(OP::OpCode opcode, Value *src,
+				  OP *hlslOP, IRBuilder<> &Builder) {
+
+  Type *Ty = src->getType();
+
+  Constant *opArg = hlslOP->GetU32Const((unsigned)opcode);
+  Value *args[] = {opArg, src};
+
+  Function *dxilFunc = hlslOP->GetOpFunc(opcode, Ty);
+
+  if (!Ty->isVoidTy()) {
+    Value *retVal =
+      Builder.CreateCall(dxilFunc, args, hlslOP->GetOpCodeName(opcode));
+    return retVal;
+  } else {
+    // Cannot add name to void.
+    return Builder.CreateCall(dxilFunc, args);
+  }
+}
+
 Value *TrivialDxilUnaryOperationRet(OP::OpCode opcode, Value *src, Type *RetTy,
                                     hlsl::OP *hlslOP, IRBuilder<> &Builder) {
   Type *Ty = src->getType();
@@ -2211,8 +2231,11 @@ Value *TranslateExp(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
         ConstantVector::getSplat(Ty->getVectorNumElements(), log2eConst);
   }
   val = Builder.CreateFMul(log2eConst, val);
-  Value *exp = TrivialDxilUnaryOperation(OP::OpCode::Exp, val, hlslOP, Builder);
-  return exp;
+  if (val->getType()->isVectorTy() &&
+      hlslOP->GetModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
+    return TrivialDxilVectorOperation(OP::OpCode::Exp, val, hlslOP, Builder);
+  else
+    return TrivialDxilUnaryOperation(OP::OpCode::Exp, val, hlslOP, Builder);
 }
 
 Value *TranslateLog(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
