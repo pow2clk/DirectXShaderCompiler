@@ -15,7 +15,7 @@ typedef double UNTYPE;
 
 // Two main test function overloads. One expects matching element types.
 // The other uses different types to test ops and overload resolution.
-template <typename T> T dostuff(T thing1, T thing2, T thing3);
+template <typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3);
 vector<TYPE, 8> dostuff(vector<TYPE, 8> thing1, vector<UNTYPE, 8> thing2, vector<TYPE, 8> thing3);
 
 float4 altogetherNow(vector<float, 8> vec1, vector<float, 8> vec2, vector<float, 8> vec3) {
@@ -149,9 +149,9 @@ float4 main() : SV_Target {
 }
 
 //  Test the required ops on long vectors and confirm correct lowering.
-template <typename T>
-T dostuff(T thing1, T thing2, T thing3) {
-  T res = 0;
+template <typename T, int N>
+vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3) {
+  vector<T, N> res = 0;
 
   // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[vec1]], <8 x [[TYPE]]> [[vec2]])  ; FMin(a,b)
   res += min(thing1, thing2);
@@ -166,7 +166,7 @@ T dostuff(T thing1, T thing2, T thing3) {
   // F32: [[vec2_64:%.*]] = fpext <8 x float> [[vec2]] to <8 x double>
   // F32: [[vec1_64:%.*]] = fpext <8 x float> [[vec1]] to <8 x double>
   // CHECK: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[vec1_64]], <8 x double> [[vec2_64]], <8 x double> [[vec3_64]]) ; Fma(a,b,c)
-  res += (T)fma((vector<double,8>)thing1, (vector<double,8>)(thing2), (vector<double,8>)thing3);
+  res += (vector<T, N>)fma((vector<double, N>)thing1, (vector<double, N>)(thing2), (vector<double, N>)thing3);
 
   // Even in the double test, these will be downconverted because these builtins only take floats.
   // F64: [[vec2_32:%.*]] = fptrunc <8 x double> [[vec2]] to <8 x float>
