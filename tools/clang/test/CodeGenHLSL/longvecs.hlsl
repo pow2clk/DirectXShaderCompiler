@@ -163,6 +163,14 @@ T dostuff(T thing1, T thing2, T thing3) {
   // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[tmp]], <8 x [[TYPE]]> [[vec3]])  ; FMin(a,b)
   res += clamp(thing1, thing2, thing3);
 
+  // TODO: try to merge checks for fma
+  // F32: [[dvec3:%.*]] = fpext <8 x float> [[vec3]] to <8 x double>
+  // F32: [[dvec2:%.*]] = fpext <8 x float> [[vec2]] to <8 x double>
+  // F32: [[dvec1:%.*]] = fpext <8 x float> [[vec1]] to <8 x double>
+  // F32: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec1]], <8 x double> [[dvec2]], <8 x double> [[dvec3]]) ; Fma(a,b,c)
+  // F64: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[vec1]], <8 x double> [[vec2]], <8 x double> [[dvec3:%.*]]) ; Fma(a,b,c)
+  res += (T)fma((vector<double,8>)thing1, (vector<double,8>)(thing2), (vector<double,8>)thing3);
+
   // Even in the double test, these will be downconverted because these builtins only take floats.
   // F64: [[vec2:%.*]] = fptrunc <8 x double> {{%.*}} to <8 x float>
   // F64: [[vec1:%.*]] = fptrunc <8 x double> {{%.*}} to <8 x float>
@@ -185,13 +193,6 @@ T dostuff(T thing1, T thing2, T thing3) {
   // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 17, <8 x float> [[vec1]])  ; Atan(value)
   res += atan(thing1);
 
-  // TODO: add checks for fma
-  // F32: [[dvec3:%.*]] = fpext <8 x float> [[vec3]] to <8 x double>
-  // F32: [[dvec2:%.*]] = fpext <8 x float> [[vec2]] to <8 x double>
-  // F32: [[dvec1:%.*]] = fpext <8 x float> [[vec1]] to <8 x double>
-  // F32: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec1]], <8 x double> [[dvec2]], <8 x double> [[dvec3]]) ; Fma(a,b,c)
-  // F64: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec1:%.*]], <8 x double> [[dvec2:%.*]], <8 x double> [[dvec3:%.*]]) ; Fma(a,b,c)
-  res += (T)fma((vector<double,8>)thing1, (vector<double,8>)(thing2), (vector<double,8>)thing3);
   return res;
 }
 
@@ -205,11 +206,14 @@ T dostuffMixed(T thing1, vector<double,8> thing2, vector<float,8> thing3) {
   // CHECK: call <8 x double> @dx.op.binary.v8f64(i32 36, <8 x double> [[tmp]], <8 x double> [[dfvec]])  ; FMin(a,b)
   res += clamp(thing1, thing2, thing3);
 
+  // CHECK: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec3]], <8 x double> [[dvec]], <8 x double> [[dfvec]]) ; Fma(a,b,c)
+  res += (T)fma((vector<double,8>)thing1, (vector<double,8>)(thing2), (vector<double,8>)thing3);
+
   // CHECK: call <8 x double> @dx.op.binary.v8f64(i32 36, <8 x double> [[dvec3]], <8 x double> [[dvec]])  ; FMin(a,b)
   res += min(thing1, thing2);
 
   // TRY TO MERGE
-  // F64: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[dfvec]])  ; FMax(a,b)
+  // F64: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[dfvec]]) ; FMax(a,b)
   // F32: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[fvec]])  ; FMax(a,b)
   res += max(thing1, thing3);
 
@@ -235,9 +239,5 @@ T dostuffMixed(T thing1, vector<double,8> thing2, vector<float,8> thing3) {
   // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 17, <8 x float> [[vec3]])  ; Atan(value)
   res += atan(thing1);
 
-  // TODO: add checks for fma
-  // F32: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec3]], <8 x double> [[dvec]], <8 x double> [[dfvec]]) ; Fma(a,b,c)
-  // F64: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[dvec1:%.*]], <8 x double> [[dvec2:%.*]], <8 x double> [[dvec3:%.*]]) ; Fma(a,b,c)
-  res += (T)fma((vector<double,8>)thing1, (vector<double,8>)(thing2), (vector<double,8>)thing3);
   return res;
 }
