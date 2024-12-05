@@ -1,7 +1,7 @@
-// RUN: %dxc -Wno-conversion -T ps_6_9       %s | Filecheck %s --check-prefixes=CHECK,F32
-// RUN: %dxc -Wno-conversion -T ps_6_9 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
+// RUN: %dxc -Wno-conversion -T cs_6_9       %s | Filecheck %s --check-prefixes=CHECK,F32
+// RUN: %dxc -Wno-conversion -T cs_6_9 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
 
-ByteAddressBuffer buf;
+RWByteAddressBuffer buf;
 
 // "TYPE" is the mainly focused test type.
 // "UNTYPE" is the other type used for mixed precision testing.
@@ -18,13 +18,7 @@ typedef double UNTYPE;
 template <typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3);
 template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector<TYPE, N> thing3);
 
-float4 altogetherNow(vector<float, 8> vec1, vector<float, 8> vec2, vector<float, 8> vec3) {
-  return vec1.xyzw + float4(vec1[4], vec1[5], vec1[6], vec1[7]) +
-    vec2.xyzw + float4(vec2[4], vec2[5], vec2[6], vec2[7]) +
-    vec3.xyzw + float4(vec3[4], vec3[5], vec3[6], vec3[7]);
-}
-
-groupshared vector<TYPE, 8> gs_vec1, gs_vec2,gs_vec3;
+groupshared vector<TYPE, 8> gs_vec1, gs_vec2, gs_vec3;
 
 // Just a trick to capture the needed type spellings since the DXC version of FileCheck can't do that explicitly.
 // F32-DAG: %dx.types.ResRet.[[TY:f32]] = type { [[TYPE:float]]
@@ -32,8 +26,9 @@ groupshared vector<TYPE, 8> gs_vec1, gs_vec2,gs_vec3;
 // F64-DAG: %dx.types.ResRet.[[TY:f64]] = type { [[TYPE:double]]
 // F64-DAG: %dx.types.ResRet.[[UNTY:f32]] = type { [[UNTYPE:float]]
 
-float4 main() : SV_Target {
-  // CHECK: [[buf:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 11, i32 0 })  ; AnnotateHandle(res,props)  resource: ByteAddressBuffer
+[numthreads(8,1,1)]
+void main() {
+  // CHECK: [[buf:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 4107, i32 0 })  ; AnnotateHandle(res,props)  resource: RWByteAddressBuffer
 
   // CHECK: [[vec1_lo:%.*]] = call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[buf]], i32 0
   // CHECK: [[vec1_0:%.*]] = extractvalue %dx.types.ResRet.[[TY]] [[vec1_lo]], 0
@@ -135,13 +130,12 @@ float4 main() : SV_Target {
   // Test mixed type operations
   vec2 = dostuff(vec2, unvec, vec3);
 
-  // TEST Groupshared. Really fucks things up now!
-  // gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
+  gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
 
   // mix groupshared and non
   //vec1 = dostuff(vec1, gs_vec2, vec3);
 
-  return (float4)altogetherNow(vec1, vec2, vec3);//*dvec.x;// - altogetherNow(gs_vec1, gs_vec2, gs_vec3);
+  buf.Store<vector<TYPE, 8> >(240, vec1 * vec2 - vec3 * gs_vec1 + gs_vec2 / gs_vec3);
 }
 
 //  Test the required ops on long vectors and confirm correct lowering.
