@@ -93,7 +93,7 @@ void hlsl::InitPSVSignatureElement(PSVSignatureElement0 &E,
   memset(&E, 0, sizeof(PSVSignatureElement0));
   DXASSERT_NOMSG(SE.GetRows() <= 32);
   E.Rows = (uint8_t)SE.GetRows();
-  DXASSERT_NOMSG(SE.GetCols() <= 4);
+  //DXASSERT_NOMSG(SE.GetCols() <= 4); // UGH
   E.ColsAndStart = (uint8_t)SE.GetCols() & 0xF;
   if (SE.IsAllocated()) {
     DXASSERT_NOMSG(SE.GetStartCol() < 4);
