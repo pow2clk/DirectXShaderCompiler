@@ -3928,7 +3928,9 @@ public:
   }
 
   QualType LookupVectorType(HLSLScalarType scalarType, unsigned int colCount) {
-    QualType qt = m_vectorTypes[scalarType][colCount - 1];
+    QualType qt;
+    if (colCount < 4)
+      qt = m_vectorTypes[scalarType][colCount - 1];
     if (qt.isNull()) {
       if (m_scalarTypes[scalarType].isNull()) {
         LookupScalarTypeDef(scalarType);
@@ -3936,7 +3938,8 @@ public:
       qt = GetOrCreateVectorSpecialization(*m_context, m_sema,
                                            m_vectorTemplateDecl,
                                            m_scalarTypes[scalarType], colCount);
-      m_vectorTypes[scalarType][colCount - 1] = qt;
+      if (colCount < 4)
+	m_vectorTypes[scalarType][colCount - 1] = qt;
     }
     return qt;
   }
@@ -4932,7 +4935,7 @@ public:
                                            false);
       } else if (objectKind == AR_TOBJ_VECTOR) {
         bool valid = true;
-        if (!IsValidVectorSize(GetHLSLVecSize(type))) {
+        if (!IsValidVectorSize(GetHLSLVecSize(type))) { // UGH
           valid = false;
           m_sema->Diag(argLoc, diag::err_hlsl_unsupportedvectorsize)
               << type << GetHLSLVecSize(type);
