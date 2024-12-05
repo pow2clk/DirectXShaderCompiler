@@ -215,6 +215,8 @@ void DxilSignatureElement::SetCompType(CompType CT) {
 
 uint8_t DxilSignatureElement::GetColsAsMask() const {
   unsigned StartCol = IsAllocated() ? m_StartCol : 0;
+  DXASSERT_ARGS(StartCol + m_Cols <= 4,
+                "else start %u and cols %u exceed limit", StartCol, m_Cols);
   DXASSERT(m_Cols >= 1, "else signature takes no space");
   switch (StartCol) {
   case 0: {
@@ -267,11 +269,11 @@ void DxilSignatureElement::SetDynIdxCompMask(unsigned DynIdxCompMask) {
 }
 
 uint8_t DxilSignatureElement::GetUsageMask() const {
-  //DXASSERT_NOMSG(m_UsageMask <= 0xF);
+  DXASSERT_NOMSG(m_UsageMask <= 0xF);
   return (uint8_t)m_UsageMask;
 }
 void DxilSignatureElement::SetUsageMask(unsigned UsageMask) {
-  //DXASSERT_NOMSG(UsageMask <= 0xF);
+  DXASSERT_NOMSG(UsageMask <= 0xF);
   m_UsageMask = UsageMask;
 }
 
