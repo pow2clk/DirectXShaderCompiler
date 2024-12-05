@@ -180,10 +180,11 @@ bool LowerTypePass::runOnModule(Module &M) {
 namespace {
 class DynamicIndexingVectorToArray : public LowerTypePass {
   bool ReplaceAllVectors;
+  const ShaderModel *m_pSM;
 
 public:
   explicit DynamicIndexingVectorToArray(bool ReplaceAll = false)
-      : LowerTypePass(ID), ReplaceAllVectors(ReplaceAll) {}
+    : LowerTypePass(ID), ReplaceAllVectors(ReplaceAll), m_pSM(nullptr) {}
   static char ID; // Pass identification, replacement for typeid
   void applyOptions(PassOptions O) override;
   void dumpConfig(raw_ostream &OS) override;
@@ -194,6 +195,7 @@ protected:
   Type *lowerType(Type *Ty) override;
   Constant *lowerInitVal(Constant *InitVal, Type *NewTy) override;
   StringRef getGlobalPrefix() override { return ".v"; }
+  void initialize(Module &M) override;
 
 private:
   bool HasVectorDynamicIndexing(Value *V);
@@ -206,6 +208,11 @@ private:
   void ReplaceStaticIndexingOnVector(Value *V);
   void ReplaceAddrSpaceCast(ConstantExpr *CE, Value *A, IRBuilder<> &Builder);
 };
+
+void DynamicIndexingVectorToArray::initialize(Module &M) {
+  if(M.HasHLModule())
+    m_pSM = M.GetHLModule().GetShaderModel();
+}
 
 void DynamicIndexingVectorToArray::applyOptions(PassOptions O) {
   GetPassOptionBool(O, "ReplaceAllVectors", &ReplaceAllVectors,
@@ -306,8 +313,11 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
 }
 
 bool DynamicIndexingVectorToArray::needToLower(Value *V) {
+  // Clunky, but effective for now
   Type *Ty = V->getType()->getPointerElementType();
-  if (dyn_cast<VectorType>(Ty)) {
+  if (isa<VectorType>(Ty)) {
+    if (m_pSM && m_pSM->IsSM69Plus())
+      return false;
     if (isa<GlobalVariable>(V) || ReplaceAllVectors) {
       return true;
     }

@@ -25,9 +25,9 @@ template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, 
 // F64-DAG: %dx.types.ResRet.[[UNTY:f32]] = type { [[UNTYPE:float]]
 
 // Verify that groupshared vectors are kept as aggregates
-// CHECK: @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
-// CHECK: @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
-// CHECK: @"\01?gs_vec3@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
+// CHECK: @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
+// CHECK: @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
+// CHECK: @"\01?gs_vec3@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
 groupshared vector<TYPE, 8> gs_vec1, gs_vec2, gs_vec3;
 
 [numthreads(8,1,1)]
