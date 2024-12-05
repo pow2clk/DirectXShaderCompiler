@@ -14211,6 +14211,7 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
                        *pDispatchGrid = nullptr, *pMaxDispatchGrid = nullptr;
   bool usageIn = false;
   bool usageOut = false;
+  bool isGroupShared = false;
 
   for (clang::AttributeList *pAttr = D.getDeclSpec().getAttributes().getList();
        pAttr != NULL; pAttr = pAttr->getNext()) {
@@ -14234,6 +14235,7 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
       }
       break;
     case AttributeList::AT_HLSLGroupShared:
+      isGroupShared = true;
       if (!isGlobal) {
         Diag(pAttr->getLoc(), diag::err_hlsl_varmodifierna)
             << pAttr->getName() << declarationType << pAttr->getRange();
@@ -14511,6 +14513,13 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
        basicKind == ArBasicKind::AR_OBJECT_POINTSTREAM ||
        basicKind == ArBasicKind::AR_OBJECT_TRIANGLESTREAM)) {
     Diag(D.getLocStart(), diag::err_hlsl_missing_inout_attr);
+    result = false;
+  }
+
+  // Vectors of over 4 elements can't fit in the cbuffer 16 byte registers.
+  if (hlsl::IsVectorType(this, qt) && hlsl::GetElementCount(qt) > 4 &&
+      isGlobal && !isStatic && !isGroupShared) {
+    Diag(D.getLocStart(), diag::err_hlsl_long_vector_in_cbuffer);
     result = false;
   }
 
