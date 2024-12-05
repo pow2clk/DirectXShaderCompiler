@@ -1945,8 +1945,8 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
         continue;
       }
 
-      // Flat Global vector if no dynamic vector indexing.
-      bool bFlatVector = !hasDynamicVectorIndexing(GV);
+      // Flat Global vector if no dynamic vector indexing and pre-6.9.
+      bool bFlatVector = !hasDynamicVectorIndexing(GV) && !HLM.GetShaderModel()->IsSM69Plus();
 
       if (bFlatVector) {
         GVDbgOffset &dbgOffset = GVDbgOffsetMap[GV];

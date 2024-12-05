@@ -18,13 +18,17 @@ typedef double UNTYPE;
 template <typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3);
 template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector<TYPE, N> thing3);
 
-groupshared vector<TYPE, 8> gs_vec1, gs_vec2, gs_vec3;
-
 // Just a trick to capture the needed type spellings since the DXC version of FileCheck can't do that explicitly.
 // F32-DAG: %dx.types.ResRet.[[TY:f32]] = type { [[TYPE:float]]
 // F32-DAG: %dx.types.ResRet.[[UNTY:f64]] = type { [[UNTYPE:double]]
 // F64-DAG: %dx.types.ResRet.[[TY:f64]] = type { [[TYPE:double]]
 // F64-DAG: %dx.types.ResRet.[[UNTY:f32]] = type { [[UNTYPE:float]]
+
+// Verify that groupshared vectors are kept as aggregates
+// CHECK: @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
+// CHECK: @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
+// CHECK: @"\01?gs_vec3@@3V?$vector@{{M|N}}$07@@A.v" = addrspace(3) global [8 x [[TYPE]]] undef
+groupshared vector<TYPE, 8> gs_vec1, gs_vec2, gs_vec3;
 
 [numthreads(8,1,1)]
 void main() {
