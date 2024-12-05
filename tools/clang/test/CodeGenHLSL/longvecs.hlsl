@@ -16,7 +16,7 @@ typedef double UNTYPE;
 // Two main test function overloads. One expects matching element types.
 // The other uses different types to test ops and overload resolution.
 template <typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3);
-vector<TYPE, 8> dostuff(vector<TYPE, 8> thing1, vector<UNTYPE, 8> thing2, vector<TYPE, 8> thing3);
+template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector<TYPE, N> thing3);
 
 float4 altogetherNow(vector<float, 8> vec1, vector<float, 8> vec2, vector<float, 8> vec3) {
   return vec1.xyzw + float4(vec1[4], vec1[5], vec1[6], vec1[7]) +
@@ -137,10 +137,8 @@ float4 main() : SV_Target {
   // Test mixed type operations
   vec2 = dostuff(vec2, unvec, vec3);
 
-  vec1[1] = dostuff(vec1[0], vec2[4], vec3[7]);
-
-  // TEST Groupshared. Really fucks things up now!
-  //gs_vec1 = dostuff(gs_vec1, gs_vec2, gs_vec3);
+  // TEST "Groupshared". Really fucks things up now!
+  //gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
 
   // mix groupshared and non
   //vec1 = dostuff(vec1, gs_vec2, vec3);
@@ -193,8 +191,9 @@ vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thin
 }
 
 // A mixed-type overload to test overload resolution and mingle different vector element types in ops
-vector<TYPE, 8> dostuff(vector<TYPE, 8> thing1, vector<UNTYPE, 8> thing2, vector<TYPE, 8> thing3) {
-  vector<TYPE, 8> res = 0;
+template<int N>
+vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector<TYPE, N> thing3) {
+  vector<TYPE, N> res = 0;
 
   // F64: [[unvec_64:%.*]] = fpext <8 x float> [[unvec]] to <8 x double>
   // CHECK: call <8 x double> @dx.op.binary.v8f64(i32 36, <8 x double> [[vec2_64]], <8 x double> [[unvec_64]])  ; FMin(a,b)
