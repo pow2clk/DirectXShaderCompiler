@@ -30,9 +30,8 @@ using namespace hlsl::HLMatrixLower;
 // After linking Lower matrix bitcast patterns like:
 //  %169 = bitcast [72 x float]* %0 to [6 x %class.matrix.float.4.3]*
 //  %conv.i = fptoui float %164 to i32
-//  %arrayidx.i = getelementptr inbounds [6 x %class.matrix.float.4.3], [6 x
-//  %class.matrix.float.4.3]* %169, i32 0, i32 %conv.i %170 = bitcast
-//  %class.matrix.float.4.3* %arrayidx.i to <12 x float>*
+//  %arrayidx.i = getelementptr inbounds [6 x %class.matrix.float.4.3], [6 x %class.matrix.float.4.3]* %169, i32 0, i32 %conv.i
+//  %170 = bitcast %class.matrix.float.4.3* %arrayidx.i to <12 x float>*
 
 namespace {
 
@@ -63,6 +62,8 @@ Type *LowerMatrixArrayPointerToOneDimArray(Type *Ty) {
   return PointerType::get(Ty, addrSpace);
 }
 
+  // This is just used as a way to determine if this is a matrix.
+  // The conversions are completely unused
 Type *TryLowerMatTy(Type *Ty) {
   Type *VecTy = nullptr;
   if (HLMatrixType::isMatrixArrayPtr(Ty)) {
@@ -83,7 +84,6 @@ public:
 
   StringRef getPassName() const override { return "Matrix Bitcast lower"; }
   bool runOnFunction(Function &F) override {
-    bool bUpdated = false;
     std::unordered_set<BitCastInst *> matCastSet;
     for (auto blkIt = F.begin(); blkIt != F.end(); ++blkIt) {
       BasicBlock *BB = blkIt;
@@ -94,7 +94,6 @@ public:
           Type *ToTy = BCI->getType();
           if (TryLowerMatTy(ToTy)) {
             matCastSet.insert(BCI);
-            bUpdated = true;
           }
         }
       }
@@ -112,10 +111,10 @@ public:
     }
 
     // Lower matrix first.
-    for (BitCastInst *BCI : matCastSet) {
-      lowerMatrix(BCI, BCI->getOperand(0));
-    }
-    return bUpdated;
+    if (!DM.GetShaderModel()->IsSM69Plus())
+      for (BitCastInst *BCI : matCastSet)
+	lowerMatrix(BCI, BCI->getOperand(0));
+    return !matCastSet.empty();
   }
 
 private:
@@ -217,7 +216,7 @@ void MatrixBitcastLowerPass::lowerMatrix(Instruction *M, Value *A) {
         for (unsigned i = 0; i < vecSize; i++) {
           Value *GEP = CreateEltGEP(A, i, zeroIdx, Builder);
           Value *Elt = Builder.CreateLoad(GEP);
-          NewVec = Builder.CreateInsertElement(NewVec, Elt, i);
+          NewVec = Builder.CreateInsertElement(NewVec, Elt, i); // Problem. Trying to insert a vector into a vector somehow
         }
         LI->replaceAllUsesWith(NewVec);
         LI->eraseFromParent();
