@@ -293,7 +293,7 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
             StoreInst *stInst = cast<StoreInst>(GEPUser);
             Value *val = stInst->getValueOperand();
             Value *ldVal = Builder.CreateLoad(V);
-            ldVal = Builder.CreateInsertElement(ldVal, val, constIdx);
+            ldVal = Builder.CreateInsertElement(ldVal, val, constIdx); // UGH
             Builder.CreateStore(ldVal, V);
             stInst->eraseFromParent();
           }
@@ -313,11 +313,10 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
 }
 
 bool DynamicIndexingVectorToArray::needToLower(Value *V) {
-  // Clunky, but effective for now
+  //if (m_pSM && m_pSM->IsSM69Plus())
+  //return false;
   Type *Ty = V->getType()->getPointerElementType();
   if (isa<VectorType>(Ty)) {
-    if (m_pSM && m_pSM->IsSM69Plus())
-      return false;
     if (isa<GlobalVariable>(V) || ReplaceAllVectors) {
       return true;
     }
