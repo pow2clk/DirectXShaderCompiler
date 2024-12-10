@@ -62,8 +62,8 @@ Type *LowerMatrixArrayPointerToOneDimArray(Type *Ty) {
   return PointerType::get(Ty, addrSpace);
 }
 
-  // This is just used as a way to determine if this is a matrix.
-  // The conversions are completely unused
+// This is just used as a way to determine if this is a matrix.
+// The conversions are completely unused
 Type *TryLowerMatTy(Type *Ty) {
   Type *VecTy = nullptr;
   if (HLMatrixType::isMatrixArrayPtr(Ty)) {
@@ -85,6 +85,7 @@ public:
   StringRef getPassName() const override { return "Matrix Bitcast lower"; }
   bool runOnFunction(Function &F) override {
     std::unordered_set<BitCastInst *> matCastSet;
+
     for (auto blkIt = F.begin(); blkIt != F.end(); ++blkIt) {
       BasicBlock *BB = blkIt;
       for (auto iIt = BB->begin(); iIt != BB->end();) {
@@ -111,14 +112,13 @@ public:
     }
 
     // Lower matrix first.
-    if (!DM.GetShaderModel()->IsSM69Plus())
-      for (BitCastInst *BCI : matCastSet)
-	lowerMatrix(BCI, BCI->getOperand(0));
+    for (BitCastInst *BCI : matCastSet)
+      lowerMatrix(DM, BCI, BCI->getOperand(0));
     return !matCastSet.empty();
   }
 
 private:
-  void lowerMatrix(Instruction *M, Value *A);
+  void lowerMatrix(DxilModule &DM, Instruction *M, Value *A);
   bool hasCallUser(Instruction *M);
 };
 
@@ -179,7 +179,7 @@ Value *CreateEltGEP(Value *A, unsigned i, Value *zeroIdx,
 }
 } // namespace
 
-void MatrixBitcastLowerPass::lowerMatrix(Instruction *M, Value *A) {
+void MatrixBitcastLowerPass::lowerMatrix(DxilModule &DM, Instruction *M, Value *A) {
   for (auto it = M->user_begin(); it != M->user_end();) {
     User *U = *(it++);
     if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(U)) {
@@ -192,19 +192,20 @@ void MatrixBitcastLowerPass::lowerMatrix(Instruction *M, Value *A) {
         SmallVector<Value *, 2> idxList(GEP->idx_begin(), GEP->idx_end());
         DXASSERT(idxList.size() == 2,
                  "else not one dim matrix array index to matrix");
-
-        HLMatrixType MatTy = HLMatrixType::cast(EltTy);
-        Value *matSize = Builder.getInt32(MatTy.getNumElements());
-        idxList.back() = Builder.CreateMul(idxList.back(), matSize);
-        Value *NewGEP = Builder.CreateGEP(A, idxList);
-        lowerMatrix(GEP, NewGEP);
+	if (!DM.GetShaderModel()->IsSM69Plus()) {
+	  HLMatrixType MatTy = HLMatrixType::cast(EltTy);
+	  Value *matSize = Builder.getInt32(MatTy.getNumElements());
+	  idxList.back() = Builder.CreateMul(idxList.back(), matSize);
+	} 
+	Value *NewGEP = Builder.CreateGEP(A, idxList);
+	lowerMatrix(DM, GEP, NewGEP);
         DXASSERT(GEP->user_empty(), "else lower matrix fail");
         GEP->eraseFromParent();
       } else {
         DXASSERT(0, "invalid GEP for matrix");
       }
     } else if (BitCastInst *BCI = dyn_cast<BitCastInst>(U)) {
-      lowerMatrix(BCI, A);
+      lowerMatrix(DM, BCI, A);
       DXASSERT(BCI->user_empty(), "else lower matrix fail");
       BCI->eraseFromParent();
     } else if (LoadInst *LI = dyn_cast<LoadInst>(U)) {
