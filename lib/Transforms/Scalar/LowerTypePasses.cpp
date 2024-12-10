@@ -313,8 +313,8 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
 }
 
 bool DynamicIndexingVectorToArray::needToLower(Value *V) {
-  //if (m_pSM && m_pSM->IsSM69Plus())
-  //return false;
+  if (m_pSM && m_pSM->IsSM69Plus())
+    return false;
   Type *Ty = V->getType()->getPointerElementType();
   if (isa<VectorType>(Ty)) {
     if (isa<GlobalVariable>(V) || ReplaceAllVectors) {
