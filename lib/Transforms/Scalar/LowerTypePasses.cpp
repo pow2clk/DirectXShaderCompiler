@@ -10,6 +10,7 @@
 #include "dxc/DXIL/DxilConstants.h"
 #include "dxc/DXIL/DxilOperations.h"
 #include "dxc/DXIL/DxilUtil.h"
+#include "dxc/DXIL/DxilModule.h"
 #include "dxc/HLSL/HLModule.h"
 #include "dxc/HLSL/HLOperations.h"
 #include "dxc/HlslIntrinsicOp.h"
@@ -180,11 +181,11 @@ bool LowerTypePass::runOnModule(Module &M) {
 namespace {
 class DynamicIndexingVectorToArray : public LowerTypePass {
   bool ReplaceAllVectors;
-  const ShaderModel *m_pSM;
+  bool SupportsVectors;
 
 public:
   explicit DynamicIndexingVectorToArray(bool ReplaceAll = false)
-    : LowerTypePass(ID), ReplaceAllVectors(ReplaceAll), m_pSM(nullptr) {}
+    : LowerTypePass(ID), ReplaceAllVectors(ReplaceAll), SupportsVectors(false) {}
   static char ID; // Pass identification, replacement for typeid
   void applyOptions(PassOptions O) override;
   void dumpConfig(raw_ostream &OS) override;
@@ -211,7 +212,7 @@ private:
 
 void DynamicIndexingVectorToArray::initialize(Module &M) {
   if(M.HasHLModule())
-    m_pSM = M.GetHLModule().GetShaderModel();
+    SupportsVectors = M.GetHLModule().GetShaderModel()->IsSM69Plus();
 }
 
 void DynamicIndexingVectorToArray::applyOptions(PassOptions O) {
@@ -313,7 +314,8 @@ void DynamicIndexingVectorToArray::ReplaceStaticIndexingOnVector(Value *V) {
 }
 
 bool DynamicIndexingVectorToArray::needToLower(Value *V) {
-  if (m_pSM && m_pSM->IsSM69Plus())
+  // Only needed where vectors aren't supported.
+  if (SupportsVectors)
     return false;
   Type *Ty = V->getType()->getPointerElementType();
   if (isa<VectorType>(Ty)) {

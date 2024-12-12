@@ -211,14 +211,24 @@ void MatrixBitcastLowerPass::lowerMatrix(DxilModule &DM, Instruction *M, Value *
     } else if (LoadInst *LI = dyn_cast<LoadInst>(U)) {
       if (VectorType *Ty = dyn_cast<VectorType>(LI->getType())) {
         IRBuilder<> Builder(LI);
-        Value *zeroIdx = Builder.getInt32(0);
-        unsigned vecSize = Ty->getNumElements();
-        Value *NewVec = UndefValue::get(LI->getType());
-        for (unsigned i = 0; i < vecSize; i++) {
-          Value *GEP = CreateEltGEP(A, i, zeroIdx, Builder);
-          Value *Elt = Builder.CreateLoad(GEP);
-          NewVec = Builder.CreateInsertElement(NewVec, Elt, i); // Problem. Trying to insert a vector into a vector somehow
-        }
+	Value *NewVec = nullptr;
+	if (DM.GetShaderModel()->IsSM69Plus()) {
+	  // Just create a replacement load using the vector pointer.
+	  Instruction* NewLI = LI->clone();
+	  unsigned VecIdx = NewLI->getNumOperands() - 1;
+	  NewLI->setOperand(VecIdx, A);
+	  Builder.Insert(NewLI);
+	  NewVec = NewLI;
+	} else {
+	  Value *zeroIdx = Builder.getInt32(0);
+	  unsigned vecSize = Ty->getNumElements();
+	  NewVec = UndefValue::get(LI->getType());
+	  for (unsigned i = 0; i < vecSize; i++) {
+	    Value *GEP = CreateEltGEP(A, i, zeroIdx, Builder);
+	    Value *Elt = Builder.CreateLoad(GEP);
+	    NewVec = Builder.CreateInsertElement(NewVec, Elt, i); // Problem. Trying to insert a vector into a vector somehow
+	  }
+	}
         LI->replaceAllUsesWith(NewVec);
         LI->eraseFromParent();
       } else {
