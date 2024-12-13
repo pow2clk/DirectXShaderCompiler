@@ -13,10 +13,13 @@ typedef float TYPE;
 typedef double UNTYPE;
 #endif
 
-// Two main test function overloads. One expects matching element types.
-// The other uses different types to test ops and overload resolution.
+// Main test function overloads. One expects matching element types.
+// The others uses different types to test ops and overload resolution.
 template <typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thing3);
 template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector<TYPE, N> thing3);
+template<typename T, int N> vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N+1> thing3);
+vector<TYPE, 8> dospecificstuff(vector<TYPE, 8> thing1, vector<TYPE, 8> thing2, vector<TYPE, 8> thing3);
+
 
 // Just a trick to capture the needed type spellings since the DXC version of FileCheck can't do that explicitly.
 // F32-DAG: %dx.types.ResRet.[[TY:f32]] = type { [[TYPE:float]]
@@ -27,8 +30,9 @@ template <int N> vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, 
 // Verify that groupshared vectors are kept as aggregates
 // CHECK: @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
 // CHECK: @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
-// CHECK: @"\01?gs_vec3@@3V?$vector@{{M|N}}$07@@A" = external addrspace(3) global <8 x [[TYPE]]>
-groupshared vector<TYPE, 8> gs_vec1, gs_vec2, gs_vec3;
+// CHECK: @"\01?gs_vec3@@3V?$vector@{{M|N}}$08@@A" = external addrspace(3) global <9 x [[TYPE]]>
+groupshared vector<TYPE, 8> gs_vec1, gs_vec2;
+groupshared vector<TYPE, 9> gs_vec3;
 
 [numthreads(8,1,1)]
 void main() {
@@ -103,6 +107,7 @@ void main() {
   // CHECK: [[pong:%.*]] = insertelement <8 x [[TYPE]]> [[ping]], [[TYPE]] [[vec3_5]]
   // CHECK: [[ping:%.*]] = insertelement <8 x [[TYPE]]> [[pong]], [[TYPE]] [[vec3_6]]
   // CHECK-DAG: [[vec3:%.*]] = insertelement <8 x [[TYPE]]> [[ping]], [[TYPE]] [[vec3_7]]
+  // F32-DAG: [[vec3_32:%.*]] = insertelement <8 x [[TYPE]]> [[ping]], [[TYPE]] [[vec3_7]]
   // F64-DAG: [[vec3_64:%.*]] = insertelement <8 x [[TYPE]]> [[ping]], [[TYPE]] [[vec3_7]]
   vector<TYPE, 8> vec3 = buf.Load<vector<TYPE, 8> >(120);
 
@@ -129,15 +134,17 @@ void main() {
   // F64-DAG: [[unvec_32:%.*]] = insertelement <8 x [[UNTYPE]]> [[ping]], [[UNTYPE]] [[unvec_7]]
   vector<UNTYPE, 8> unvec = buf.Load<vector<UNTYPE, 8> >(180);
 
+  // Test vectors of equal type and size.
   vec1 = dostuff(vec1, vec2, vec3);
 
   // Test mixed type operations
   vec2 = dostuff(vec2, unvec, vec3);
 
+  // Test groupshared vectors of different sizes.
   gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
 
-  // mix groupshared and non
-  //vec1 = dostuff(vec1, gs_vec2, vec3);
+  // Test groupshared and default namespace vectors.
+  gs_vec1 = dospecificstuff(vec3, gs_vec2, gs_vec1);
 
   buf.Store<vector<TYPE, 8> >(240, vec1 * vec2 - vec3 * gs_vec1 + gs_vec2 / gs_vec3);
 }
@@ -222,6 +229,89 @@ vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector
   res += tanh(thing1);
   // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 17, <8 x float> [[vec2_32]])  ; Atan(value)
   res += atan(thing1);
+
+  return res;
+}
+
+// Test with different sized vectors.
+// Used for groupshared tests.
+template<typename T, int N>
+vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N+1> thing3) {
+  vector<T, N> res = 0;
+
+  // CHECK: [[gs_vec3_pre:%.*]] = load <9 x [[TYPE]]>, <9 x [[TYPE]]> addrspace(3)* @"\01?gs_vec3@@3V?$vector@{{M|N}}$08@@A"
+  // CHECK-DAG: [[gs_vec2:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  // F32-DAG: [[gs_vec2_32:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  // F64-DAG: [[gs_vec2_64:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  // CHECK-DAG: [[gs_vec1:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A"
+  // F32-DAG: [[gs_vec1_32:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A"
+  // F64-DAG: [[gs_vec1_64:%.*]] = load <8 x [[TYPE]]>, <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec1@@3V?$vector@{{M|N}}$07@@A"
+
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[gs_vec1]], <8 x [[TYPE]]> [[gs_vec2]])  ; FMin(a,b)
+  res += min(thing1, thing2);
+  // CHECK-DAG: [[gs_vec3:%.*]] = shufflevector <9 x [[TYPE]]> [[gs_vec3_pre]], <9 x [[TYPE]]> undef, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+  // F64-DAG: [[gs_vec3_64:%.*]] = shufflevector <9 x [[TYPE]]> [[gs_vec3_pre]], <9 x [[TYPE]]> undef, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[gs_vec1]], <8 x [[TYPE]]> [[gs_vec3]])  ; FMax(a,b)
+  res += max(thing1, thing3);
+
+  // CHECK: [[tmp:%.*]] = call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[gs_vec1]], <8 x [[TYPE]]> [[gs_vec2]])  ; FMax(a,b)
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[tmp]], <8 x [[TYPE]]> [[gs_vec3]])  ; FMin(a,b)
+  res += clamp(thing1, thing2, thing3);
+
+  // F32: [[gs_vec3_64:%.*]] = fpext <8 x float> [[gs_vec3]] to <8 x double>
+  // F32: [[gs_vec2_64:%.*]] = fpext <8 x float> [[gs_vec2]] to <8 x double>
+  // F32: [[gs_vec1_64:%.*]] = fpext <8 x float> [[gs_vec1]] to <8 x double>
+  // CHECK: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[gs_vec1_64]], <8 x double> [[gs_vec2_64]], <8 x double> [[gs_vec3_64]]) ; Fma(a,b,c)
+  res += (vector<T, N>)fma((vector<double, N>)thing1, (vector<double, N>)(thing2), (vector<double, N>)thing3);
+
+  // Even in the double test, these will be downconverted because these builtins only take floats.
+  // F64: [[gs_vec2_32:%.*]] = fptrunc <8 x double> [[gs_vec2]] to <8 x float>
+  // F64: [[gs_vec1_32:%.*]] = fptrunc <8 x double> [[gs_vec1]] to <8 x float>
+
+  // CHECK: [[tmp:%.*]] = fcmp fast olt <8 x float> [[gs_vec2_32]], [[gs_vec1_32]]
+  // CHECK: select <8 x i1> [[tmp]], <8 x [[TYPE]]> zeroinitializer, <8 x [[TYPE]]> <[[TYPE]] 1
+  res += step(thing1, thing2);
+
+  // CHECK: [[tmp:%.*]] = fmul fast <8 x float> [[gs_vec1_32]], <float 0x
+  // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 21, <8 x float> [[tmp]])  ; Exp(value)
+  res += exp(thing1);
+
+  // CHECK: [[tmp:%.*]] = call <8 x float> @dx.op.unary.v8f32(i32 23, <8 x float> [[gs_vec1_32]])  ; Log(value)
+  // CHECK: fmul fast <8 x float> [[tmp]], <float 0x
+  res += log(thing1);
+
+  // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 20, <8 x float> [[gs_vec1_32]])  ; Htan(value)
+  res += tanh(thing1);
+  // CHECK: call <8 x float> @dx.op.unary.v8f32(i32 17, <8 x float> [[gs_vec1_32]])  ; Atan(value)
+  res += atan(thing1);
+
+  // CHECK-DAG: store <8 x [[TYPE]]> [[gs_vec2:%.*]], <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  // F32-DAG: store <8 x [[TYPE]]> [[gs_vec2_32:%.*]], <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  // F64-DAG: store <8 x [[TYPE]]> [[gs_vec2_64:%.*]], <8 x [[TYPE]]> addrspace(3)* @"\01?gs_vec2@@3V?$vector@{{M|N}}$07@@A"
+  return res;
+}
+
+vector<TYPE, 8> dospecificstuff(vector<TYPE, 8> thing1, vector<TYPE, 8> thing2, vector<TYPE, 8> thing3) {
+  vector<TYPE, 8> res = 0;
+
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[gs_vec2]])  ; FMin(a,b)
+  res += min(thing1, thing2);
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[gs_vec1]])  ; FMax(a,b)
+  res += max(thing1, thing3);
+
+  // CHECK: [[tmp:%.*]] = call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 35, <8 x [[TYPE]]> [[vec3]], <8 x [[TYPE]]> [[gs_vec2]])  ; FMax(a,b)
+  // CHECK: call <8 x [[TYPE]]> @dx.op.binary.v8[[TY]](i32 36, <8 x [[TYPE]]> [[tmp]], <8 x [[TYPE]]> [[gs_vec1]])  ; FMin(a,b)
+  res += clamp(thing1, thing2, thing3);
+
+  // F32: [[gs_vec2_64:%.*]] = fpext <8 x float> [[gs_vec2]] to <8 x double>
+  // CHECK: call <8 x double> @dx.op.tertiary.v8f64(i32 47, <8 x double> [[vec3_64]], <8 x double> [[gs_vec2_64]], <8 x double> [[gs_vec1_64]]) ; Fma(a,b,c)
+  res += (vector<TYPE, 8>)fma((vector<double, 8>)thing1, (vector<double, 8>)(thing2), (vector<double, 8>)thing3);
+
+  // F64: [[gs_vec2_32:%.*]] = fptrunc <8 x double> [[gs_vec2]] to <8 x float>
+  // F64: [[vec3_32:%.*]] = fptrunc <8 x double> [[vec3]] to <8 x float>
+  // CHECK: [[tmp:%.*]] = fcmp fast olt <8 x float> [[gs_vec2_32]], [[vec3_32]]
+  // CHECK: select <8 x i1> [[tmp]], <8 x [[TYPE]]> zeroinitializer, <8 x [[TYPE]]> <[[TYPE]] 1
+  res += step(thing1, thing2);
 
   return res;
 }
