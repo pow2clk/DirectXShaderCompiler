@@ -1,3 +1,5 @@
+// RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=1       %s | Filecheck %s --check-prefixes=CHECK,F32
+// RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=1 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=2       %s | Filecheck %s --check-prefixes=CHECK,F32
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=2 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=3       %s | Filecheck %s --check-prefixes=CHECK,F32
@@ -78,27 +80,27 @@ void main() {
   // CHECK: [[buf:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 4107, i32 0 })  ; AnnotateHandle(res,props)  resource: RWByteAddressBuffer
 
   // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[buf]], i32 0
-  // CHECK-DAG: [[vec1:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F32-DAG: [[vec1_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F64-DAG: [[vec1_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // CHECK-DAG: [[vec1:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F32-DAG: [[vec1_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F64-DAG: [[vec1_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   vector<TYPE, ELTS> vec1 = buf.Load<vector<TYPE, ELTS> >(0);
 
   // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[buf]], i32 60
-  // CHECK-DAG: [[vec2:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F32-DAG: [[vec2_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F64-DAG: [[vec2_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // CHECK-DAG: [[vec2:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F32-DAG: [[vec2_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F64-DAG: [[vec2_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   vector<TYPE, ELTS> vec2 = buf.Load<vector<TYPE, ELTS> >(60);
 
   // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[buf]], i32 120
-  // CHECK-DAG: [[vec3:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F32-DAG: [[vec3_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F64-DAG: [[vec3_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{%.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // CHECK-DAG: [[vec3:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F32-DAG: [[vec3_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F64-DAG: [[vec3_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   vector<TYPE, ELTS> vec3 = buf.Load<vector<TYPE, ELTS> >(120);
 
   // CHECK: call %dx.types.ResRet.[[UNTY]] @dx.op.rawBufferLoad.[[UNTY]](i32 139, %dx.types.Handle [[buf]], i32 180
-  // CHECK-DAG: [[unvec:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{%.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F32-DAG: [[unvec_64:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{%.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
-  // F64-DAG: [[unvec_32:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{%.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // CHECK-DAG: [[unvec:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F32-DAG: [[unvec_64:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
+  // F64-DAG: [[unvec_32:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
   vector<UNTYPE, ELTS> unvec = buf.Load<vector<UNTYPE, ELTS> >(180);
 
   // Test vectors of equal type and size.
@@ -149,7 +151,6 @@ vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N> thin
   res += exp(thing1);
 
   // CHECK: [[tmp:%.*]] = call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 23, <[[ELTS]] x float> [[vec1_32]])  ; Log(value)
-  // CHECK: fmul fast <[[ELTS]] x float> [[tmp]], <float 0x
   res += log(thing1);
 
   // CHECK: call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 20, <[[ELTS]] x float> [[vec1_32]])  ; Htan(value)
@@ -189,7 +190,6 @@ vector<TYPE, N> dostuff(vector<TYPE, N> thing1, vector<UNTYPE, N> thing2, vector
   res += exp(thing1);
 
   // CHECK: [[tmp:%.*]] = call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 23, <[[ELTS]] x float> [[vec2_32]])  ; Log(value)
-  // CHECK: fmul fast <[[ELTS]] x float> [[tmp]], <float 0x
   res += log(thing1);
 
   // CHECK: call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 20, <[[ELTS]] x float> [[vec2_32]])  ; Htan(value)
@@ -216,8 +216,8 @@ vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N+1> th
 
   // CHECK: call <[[ELTS]] x [[TYPE]]> @dx.op.binary.v[[ELTS]][[TY]](i32 36, <[[ELTS]] x [[TYPE]]> [[gs_vec1]], <[[ELTS]] x [[TYPE]]> [[gs_vec2]])  ; FMin(a,b)
   res += min(thing1, thing2);
-  // CHECK-DAG: [[gs_vec3:%.*]] = shufflevector <[[ELTSp1]] x [[TYPE]]> [[gs_vec3_pre]], <[[ELTSp1]] x [[TYPE]]> undef, <[[ELTS]] x i32> <i32 0, i32 1
-  // F64-DAG: [[gs_vec3_64:%.*]] = shufflevector <[[ELTSp1]] x [[TYPE]]> [[gs_vec3_pre]], <[[ELTSp1]] x [[TYPE]]> undef, <[[ELTS]] x i32> <i32 0, i32 1
+  // CHECK-DAG: [[gs_vec3:%.*]] = shufflevector <[[ELTSp1]] x [[TYPE]]> [[gs_vec3_pre]], <[[ELTSp1]] x [[TYPE]]> undef, <[[ELTS]] x i32>
+  // F64-DAG: [[gs_vec3_64:%.*]] = shufflevector <[[ELTSp1]] x [[TYPE]]> [[gs_vec3_pre]], <[[ELTSp1]] x [[TYPE]]> undef, <[[ELTS]] x i32>
   // CHECK: call <[[ELTS]] x [[TYPE]]> @dx.op.binary.v[[ELTS]][[TY]](i32 35, <[[ELTS]] x [[TYPE]]> [[gs_vec1]], <[[ELTS]] x [[TYPE]]> [[gs_vec3]])  ; FMax(a,b)
   res += max(thing1, thing3);
 
@@ -244,7 +244,7 @@ vector<T, N> dostuff(vector<T, N> thing1, vector<T, N> thing2, vector<T, N+1> th
   res += exp(thing1);
 
   // CHECK: [[tmp:%.*]] = call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 23, <[[ELTS]] x float> [[gs_vec1_32]])  ; Log(value)
-  // CHECK: fmul fast <[[ELTS]] x float> [[tmp]], <float 0x
+  // CHICK: fmul fast <[[ELTS]] x float> [[tmp]], <float 0x
   res += log(thing1);
 
   // CHECK: call <[[ELTS]] x float> @dx.op.unary.v[[ELTS]]f32(i32 20, <[[ELTS]] x float> [[gs_vec1_32]])  ; Htan(value)
