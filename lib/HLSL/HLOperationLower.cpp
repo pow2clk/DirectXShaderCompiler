@@ -4569,9 +4569,6 @@ void TranslateStore(DxilResource::Kind RK, Value *handle, Value *val,
       (CompCount / MaxStoreElemCount) + (CompCount % MaxStoreElemCount != 0);
   SmallVector<decltype(storeArgs), 4> storeArgsList;
 
-  // Max number of element to store should be 16 (for a 4x4 matrix)
-  DXASSERT_NOMSG(StoreInstCount >= 1 && StoreInstCount <= 4);
-
   // If number of elements to store exceeds the maximum number of elements
   // that can be stored in a single store call,  make sure to generate enough
   // store calls to store all elements

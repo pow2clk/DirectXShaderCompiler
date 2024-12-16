@@ -34,6 +34,8 @@
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=17 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=18       %s | Filecheck %s --check-prefixes=CHECK,F32
 // RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=18 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
+// RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=128       %s | Filecheck %s --check-prefixes=CHECK,F32
+// RUN: %dxc -Wno-conversion -T cs_6_9 -DELTS=128 -DF64 %s | Filecheck %s --check-prefixes=CHECK,F64
 
 RWByteAddressBuffer buf;
 
@@ -74,8 +76,8 @@ void main() {
   // CHECK: [[buf:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 4107, i32 0 })  ; AnnotateHandle(res,props)  resource: RWByteAddressBuffer
 
   // A contrivance to capture the vec size - 1.
-  // CHECK: call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle [[buf]], i32 250, i32 undef, i32 [[ELTSm1:[0-9]*]]
-  buf.Store<int>(250, ELTS-1);
+  // CHECK: call void @dx.op.rawBufferStore.i32(i32 140, %dx.types.Handle [[buf]], i32 10000, i32 undef, i32 [[ELTSm1:[0-9]*]]
+  buf.Store<int>(10000, ELTS-1);
 
   // CHECK: [[buf:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle %1, %dx.types.ResourceProperties { i32 4107, i32 0 })  ; AnnotateHandle(res,props)  resource: RWByteAddressBuffer
 
@@ -89,20 +91,21 @@ void main() {
   // CHECK-DAG: [[vec2:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F32-DAG: [[vec2_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F64-DAG: [[vec2_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  vector<TYPE, ELTS> vec2 = buf.Load<vector<TYPE, ELTS> >(60);
+  vector<TYPE, ELTS> vec2 = buf.Load<vector<TYPE, ELTS> >(600);
 
   // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[buf]], i32 120
   // CHECK-DAG: [[vec3:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F32-DAG: [[vec3_32:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F64-DAG: [[vec3_64:%.*]] = insertelement <[[ELTS]] x [[TYPE]]> {{.*}}, [[TYPE]] {{%.*}}, i64 [[ELTSm1]]
-  vector<TYPE, ELTS> vec3 = buf.Load<vector<TYPE, ELTS> >(120);
+  vector<TYPE, ELTS> vec3 = buf.Load<vector<TYPE, ELTS> >(1200);
 
   // CHECK: call %dx.types.ResRet.[[UNTY]] @dx.op.rawBufferLoad.[[UNTY]](i32 139, %dx.types.Handle [[buf]], i32 180
   // CHECK-DAG: [[unvec:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F32-DAG: [[unvec_64:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
   // F64-DAG: [[unvec_32:%.*]] = insertelement <[[ELTS]] x [[UNTYPE]]> {{.*}}, [[UNTYPE]] {{%.*}}, i64 [[ELTSm1]]
-  vector<UNTYPE, ELTS> unvec = buf.Load<vector<UNTYPE, ELTS> >(180);
+  vector<UNTYPE, ELTS> unvec = buf.Load<vector<UNTYPE, ELTS> >(1800);
 
+  // Just some jumps to keep things interesting.
   // Test vectors of equal type and size.
   vec1 = dostuff(vec1, vec2, vec3);
 
@@ -115,7 +118,7 @@ void main() {
   // Test groupshared and default namespace vectors.
   gs_vec1 = dospecificstuff(vec3, gs_vec2, gs_vec1);
 
-  buf.Store<vector<TYPE, ELTS> >(240, vec1 * vec2 - vec3 * gs_vec1 + gs_vec2 / gs_vec3);
+  buf.Store<vector<TYPE, ELTS> >(2400, vec1 * vec2 - vec3 * gs_vec1 + gs_vec2 / gs_vec3);
 }
 
 //  Test the required ops on long vectors and confirm correct lowering.
