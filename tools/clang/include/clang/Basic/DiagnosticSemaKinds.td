@@ -7693,8 +7693,6 @@ def err_hlsl_control_flow_cond_not_scalar : Error<
   "%0 statement conditional expressions must evaluate to a scalar">;
 def err_hlsl_unsupportedvectortype : Error<
   "%0 is declared with type %1, but only primitive scalar values are supported">;
-def err_hlsl_unsupportedvectorsize : Error<
-  "%0 is declared with size %1, but only values 1 through 4 are supported">;
 def err_hlsl_unsupportedmatrixsize : Error<
   "%0 is declared with size %1x%2, but only values 1 through 4 are supported">;
 def err_hlsl_norm_float_only : Error<
