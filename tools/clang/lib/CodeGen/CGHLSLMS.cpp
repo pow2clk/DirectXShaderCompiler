@@ -1925,6 +1925,15 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
   }
 
   ConstructFieldAttributedAnnotation(retTyAnnotation, retTy, bDefaultRowMajor);
+  // Check for overlarge return val in entry case here using vectorsize in retTyAnnotation.
+  if (isEntry && retTyAnnotation.GetVectorSize() > 4) {
+    DiagnosticsEngine &Diags = CGM.getDiags();
+    unsigned DiagID = Diags.getCustomDiagID(
+					    DiagnosticsEngine::Error,
+					    "Entry function cannot return a vector of size > 4");
+    Diags.Report(FD->getLocation(), DiagID);
+  }
+
   if (FD->hasAttr<HLSLPreciseAttr>())
     retTyAnnotation.SetPrecise();
 
@@ -1956,6 +1965,15 @@ void CGMSHLSLRuntime::AddHLSLFunctionInfo(Function *F, const FunctionDecl *FD) {
       fieldTy = fieldTy.getDesugaredType(FD->getASTContext());
     ConstructFieldAttributedAnnotation(paramAnnotation, fieldTy,
                                        bDefaultRowMajor);
+    // Check for overlarge entry parameter here using vectorsize in paramAnnotation.
+    if (isEntry && paramAnnotation.GetVectorSize() > 4) {
+      DiagnosticsEngine &Diags = CGM.getDiags();
+      unsigned DiagID = Diags.getCustomDiagID(
+					      DiagnosticsEngine::Error,
+					      "Entry function cannot take a vector argument of size > 4");
+      Diags.Report(parmDecl->getLocation(), DiagID);
+      return;
+    }
     if (parmDecl->hasAttr<HLSLPreciseAttr>())
       paramAnnotation.SetPrecise();
 
@@ -3467,6 +3485,17 @@ bool CGMSHLSLRuntime::SetUAVSRV(SourceLocation loc,
     QualType EltTy = Ty;
     if (hlsl::IsHLSLVecType(Ty)) {
       EltTy = hlsl::GetHLSLVecElementType(Ty);
+      unsigned row = 0;
+      unsigned col = 0;
+      hlsl::GetRowsAndColsForAny(Ty, row, col);
+      if (col > 4) {
+        DiagnosticsEngine &Diags = CGM.getDiags();
+        unsigned DiagID = Diags.getCustomDiagID(
+            DiagnosticsEngine::Error,
+            "%0 contains a vector of size %1 and cannot be used in a type buffer");
+        Diags.Report(loc, DiagID) << hlslRes->GetGlobalName() << col;
+        return false;
+      }
     } else if (hlsl::IsHLSLMatType(Ty)) {
       EltTy = hlsl::GetHLSLMatElementType(Ty);
     } else if (hlsl::IsHLSLAggregateType(resultTy)) {
