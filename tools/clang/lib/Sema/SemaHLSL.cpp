@@ -4896,10 +4896,6 @@ public:
            AR_BASIC_UNKNOWN;
   }
 
-  /// <summary>Checks whether the specified value is a valid vector
-  /// size.</summary>
-  bool IsValidVectorSize(size_t length) { return 1 <= length && length <= 4; }
-
   /// <summary>Checks whether the specified value is a valid matrix row or
   /// column size.</summary>
   bool IsValidMatrixColOrRowSize(size_t length) {
@@ -4935,11 +4931,6 @@ public:
                                            false);
       } else if (objectKind == AR_TOBJ_VECTOR) {
         bool valid = true;
-        if (!IsValidVectorSize(GetHLSLVecSize(type))) { // UGH
-          valid = false;
-          m_sema->Diag(argLoc, diag::err_hlsl_unsupportedvectorsize)
-              << type << GetHLSLVecSize(type);
-        }
         if (!IsScalarType(GetMatrixOrVectorElementType(type))) {
           valid = false;
           m_sema->Diag(argLoc, diag::err_hlsl_unsupportedvectortype)
