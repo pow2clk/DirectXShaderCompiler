@@ -817,9 +817,10 @@ bool CanUseFxcMulOnlyPatternForPow(IRBuilder<> &Builder, Value *x, Value *pow,
     }
   }
 
-  // Only apply on vectors of 4 or fewer elements
+  // Only apply on aggregates of 16 or fewer elements,
+  // representing the max 4x4 matrix size.
   Type *xTy = x->getType();
-  if (xTy->isVectorTy() && xTy->getVectorNumElements() > 4)
+  if (xTy->isVectorTy() && xTy->getVectorNumElements() > 16)
     return false;
 
   APFloat powAPF = isa<ConstantDataVector>(pow)
