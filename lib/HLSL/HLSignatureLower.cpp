@@ -1653,8 +1653,7 @@ void HLSignatureLower::GenerateStreamOutputOperation(Value *streamVal,
     if (group == HLOpcodeGroup::NotHL)
       continue;
     unsigned opcode = GetHLOpcode(CI);
-    DXASSERT_LOCALVAR(group, group == HLOpcodeGroup::HLIntrinsic,
-                      "Must be HLIntrinsic here");
+    DXASSERT(group == HLOpcodeGroup::HLIntrinsic, "Must be HLIntrinsic here");
     IntrinsicOp IOP = static_cast<IntrinsicOp>(opcode);
     switch (IOP) {
     case IntrinsicOp::MOP_Append:

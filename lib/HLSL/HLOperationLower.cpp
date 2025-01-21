@@ -4315,12 +4315,10 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
   loadArgs.emplace_back(opArg);         // opcode
   loadArgs.emplace_back(helper.handle); // resource handle
 
+  // offsets
   if (opcode == OP::OpCode::TextureLoad) {
     // set mip level
     loadArgs.emplace_back(helper.mipLevel);
-  }
-
-  if (opcode == OP::OpCode::TextureLoad) {
     // texture coord
     unsigned coordSize = DxilResource::GetNumCoords(RK);
     bool isVectorAddr = helper.addr->getType()->isVectorTy();
@@ -4361,11 +4359,9 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
       loadArgs.emplace_back(undefI);
       loadArgs.emplace_back(undefI);
     }
-  }
-
-  // Offset 1
-  if (RK == DxilResource::Kind::TypedBuffer) {
-    loadArgs.emplace_back(undefI);
+  } else {
+    loadArgs.emplace_back(helper.addr); // c0
+    loadArgs.emplace_back(undefI); // c1
   }
 
   Value *ResRet = Builder.CreateCall(F, loadArgs, OP->GetOpCodeName(opcode));
@@ -6207,8 +6203,6 @@ Value *TranslateAnd(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
                     bool &Translated) {
   Value *x = CI->getArgOperand(HLOperandIndex::kBinaryOpSrc0Idx);
   Value *y = CI->getArgOperand(HLOperandIndex::kBinaryOpSrc1Idx);
-  Type *Ty = CI->getType();
-  Type *EltTy = Ty->getScalarType();
   IRBuilder<> Builder(CI);
 
   return Builder.CreateAnd(x, y);
@@ -6277,7 +6271,7 @@ Value *StreamOutputLower(CallInst *CI, IntrinsicOp IOP, DXIL::OpCode opcode,
                          HLOperationLowerHelper &helper,
                          HLObjectOperationLowerHelper *pObjHelper,
                          bool &Translated) {
-  // Translated in DxilGenerationPass::GenerateStreamOutputOperation.
+  // Translated in HLSignatureLower::GenerateStreamOutputOperation.
   // Do nothing here.
   // Mark not translated.
   Translated = false;
@@ -7982,7 +7976,7 @@ static Value *ExtractFromTypedBufferLoad(const ResRetValueArray &ResRet,
     DXASSERT_NOMSG(FirstElemIdx <= ResRet.size() - ElemCount);
     for (unsigned ElemIdx = 0; ElemIdx < ElemCount; ++ElemIdx) {
       Elems.emplace_back(
-          ResRet[std::min<size_t>(FirstElemIdx + ElemIdx, ResRet.size() - 1)]);
+                         ResRet[std::min<size_t>(FirstElemIdx + ElemIdx, ResRet.size() - 1)]);// there is no way this is right. why add the offset here?
     }
   } else {
     Value *ArrayAlloca = SpillValuesToArrayAlloca(
@@ -8367,15 +8361,6 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
     if (group == HLOpcodeGroup::HLIntrinsic) {
       IntrinsicOp IOP = static_cast<IntrinsicOp>(opcode);
       switch (IOP) {
-      case IntrinsicOp::MOP_Load: {
-        if (userCall->getType()->isPointerTy()) {
-          // Struct will return pointers which like []
-
-        } else {
-          // Use builtin types on structuredBuffer.
-        }
-        DXASSERT(0, "not implement yet");
-      } break;
       case IntrinsicOp::IOP_InterlockedAdd: {
         AtomicHelper helper(userCall, DXIL::OpCode::AtomicBinOp, handle, bufIdx,
                             baseOffset);
