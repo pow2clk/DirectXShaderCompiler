@@ -4330,22 +4330,6 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
       } else
         loadArgs.emplace_back(undefI);
     }
-  } else {
-    if (helper.addr->getType()->isVectorTy()) {
-      Value *scalarOffset =
-          Builder.CreateExtractElement(helper.addr, (uint64_t)0);
-
-      // TODO: calculate the real address based on opcode
-
-      loadArgs.emplace_back(scalarOffset); // offset
-    } else {
-      // TODO: calculate the real address based on opcode
-
-      loadArgs.emplace_back(helper.addr); // offset
-    }
-  }
-  // offset 0
-  if (opcode == OP::OpCode::TextureLoad) {
     if (helper.offset && !isa<llvm::UndefValue>(helper.offset)) {
       unsigned offsetSize = DxilResource::GetNumOffsets(RK);
       for (unsigned i = 0; i < 3; i++) {
@@ -4535,12 +4519,7 @@ void TranslateStore(DxilResource::Kind RK, Value *handle, Value *val,
   if (RK == DxilResource::Kind::RawBuffer ||
       RK == DxilResource::Kind::TypedBuffer) {
     // Offset 0
-    if (offset->getType()->isVectorTy()) {
-      Value *scalarOffset = Builder.CreateExtractElement(offset, (uint64_t)0);
-      storeArgs.emplace_back(scalarOffset); // offset
-    } else {
-      storeArgs.emplace_back(offset); // offset
-    }
+    storeArgs.emplace_back(offset); // offset
 
     // Store offset0 for later use
     offset0Idx = storeArgs.size() - 1;
