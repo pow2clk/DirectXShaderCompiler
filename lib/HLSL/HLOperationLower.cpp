@@ -4234,6 +4234,95 @@ static Value *TranslateRawBufVecLd(Type *VecEltTy, unsigned VecElemCount,
                                    std::vector<Value *> &bufLds,
                                    unsigned baseAlign, bool isScalarTy = false);
 
+void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
+                         IRBuilder<> &Builder, hlsl::OP *OP,
+                         const DataLayout &DL) {
+
+  Type *Ty = helper.retVal->getType();
+  Type *EltTy = Ty->getScalarType();
+  unsigned numComponents = 1;
+  DXASSERT(helper.opcode == OP::OpCode::RawBufferLoad,
+           "rawbufload with wrong helper opcode");
+
+  if (Ty->isVectorTy()) {
+    numComponents = Ty->getVectorNumElements();
+  }
+
+  std::vector<Value *> bufLds;
+  const bool isBool = EltTy->isIntegerTy(1);
+
+  // Bool are represented as i32 in memory
+  EltTy = isBool ? Builder.getInt32Ty() : EltTy;
+  bool isScalarTy = !Ty->isVectorTy();
+
+  Value *retValNew = nullptr;
+  // BEGIN TranslateRawBufVecLd
+  unsigned EltSize = DL.getTypeAllocSize(EltTy);
+  unsigned alignment = std::min(4U, EltSize);
+  Constant *alignmentVal = OP->GetI32Const(alignment);
+
+  Value *bufIdx = helper.addr;
+  // DELETE: does this happen? Maybe only when lowering subscript users.
+  if (bufIdx == nullptr) {
+    bufIdx = OP->GetU32Const(0);
+  }
+
+  std::vector<Value *> elts(numComponents);
+  OP::OpCode opcode = OP::OpCode::RawBufferLoad;
+  Function *dxilF = OP->GetOpFunc(opcode, EltTy);
+  Value *undefOffset = UndefValue::get(bufIdx->getType());
+
+  for (unsigned i = 0; i < numComponents;) {
+    Value *resultElts[4];
+    unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
+
+    // BEGIN GenerateRawBufLd
+    Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
+    Value *Args[] = {OP->GetU32Const((unsigned)opcode),
+                     helper.handle,
+                     bufIdx,
+                     undefOffset,
+                     mask,
+                     alignmentVal};
+    Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
+
+    for (unsigned i = 0; i < chunkSize; i++) {
+      resultElts[i] = Builder.CreateExtractValue(Ld, i);
+    }
+
+    // status
+    UpdateStatus(Ld, helper.status, Builder, OP);
+    // END GenerateRawBufLd
+    bufLds.emplace_back(Ld);
+
+    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
+      elts[i++] = resultElts[j];
+
+    if (i < numComponents)
+      bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
+  }
+
+  // If the expected return type is scalar then skip building a vector
+  if (isScalarTy) {
+    retValNew = elts[0];
+  } else {
+    retValNew = HLMatrixLower::BuildVector(EltTy, elts, Builder);
+  }
+  // END TranslateRawBufVecLd
+
+  DXASSERT_NOMSG(!bufLds.empty());
+  dxilutil::MigrateDebugValue(helper.retVal, bufLds.front());
+
+  if (isBool) {
+    // Convert result back to register representation.
+    retValNew = Builder.CreateICmpNE(
+        retValNew, Constant::getNullValue(retValNew->getType()));
+  }
+
+  helper.retVal->replaceAllUsesWith(retValNew);
+  helper.retVal = retValNew;
+}
+
 void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
                    IRBuilder<> &Builder, hlsl::OP *OP, const DataLayout &DL) {
 
@@ -4243,6 +4332,11 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
              "Textures should not be treated as structured buffers.");
     TranslateStructBufSubscript(cast<CallInst>(helper.retVal), helper.handle,
                                 helper.status, OP, RK, DL);
+    return;
+  }
+
+  if (DXIL::IsRawBuffer(RK)) {
+    TranslateRawBufLoad(helper, RK, Builder, OP, DL);
     return;
   }
 
