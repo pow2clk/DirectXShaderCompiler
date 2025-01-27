@@ -7924,7 +7924,7 @@ Value *GenerateRawBufLd(Value *handle, Value *bufIdx, Value *offset,
                    alignment};
   Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
 
-  for (unsigned i = 0; i < resultElts.size(); i++) {
+  for (unsigned i = 0; i < NumComponents; i++) {
     resultElts[i] = Builder.CreateExtractValue(Ld, i);
   }
 
@@ -7970,29 +7970,20 @@ static Value *TranslateRawBufVecLd(Type *VecEltTy, unsigned ElemCount,
   }
 
   std::vector<Value *> elts(ElemCount);
-  unsigned rest = (ElemCount % 4);
-  for (unsigned i = 0; i < ElemCount - rest; i += 4) {
+
+  for (unsigned i = 0; i < ElemCount;) {
     Value *ResultElts[4];
+    unsigned chunkSize = (ElemCount - i) <= 4 ? ElemCount - i : 4;
     Value *bufLd =
         GenerateRawBufLd(handle, bufIdx, baseOffset, status, VecEltTy,
-                         ResultElts, OP, Builder, 4, alignmentVal);
+                         ResultElts, OP, Builder, chunkSize, alignmentVal);
     bufLds.emplace_back(bufLd);
-    elts[i] = ResultElts[0];
-    elts[i + 1] = ResultElts[1];
-    elts[i + 2] = ResultElts[2];
-    elts[i + 3] = ResultElts[3];
 
-    baseOffset = Builder.CreateAdd(baseOffset, OP->GetU32Const(4 * EltSize));
-  }
+    for (unsigned j = 0; i < ElemCount && j < chunkSize; j++)
+      elts[i++] = ResultElts[j];
 
-  if (rest) {
-    Value *ResultElts[4];
-    Value *bufLd =
-        GenerateRawBufLd(handle, bufIdx, baseOffset, status, VecEltTy,
-                         ResultElts, OP, Builder, rest, alignmentVal);
-    bufLds.emplace_back(bufLd);
-    for (unsigned i = 0; i < rest; i++)
-      elts[ElemCount - rest + i] = ResultElts[i];
+    if (i < ElemCount)
+      baseOffset = Builder.CreateAdd(baseOffset, OP->GetU32Const(4 * EltSize));
   }
 
   // If the expected return type is scalar then skip building a vector
