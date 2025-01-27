@@ -4256,7 +4256,6 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   bool isScalarTy = !Ty->isVectorTy();
 
   Value *retValNew = nullptr;
-  // BEGIN TranslateRawBufVecLd
   unsigned EltSize = DL.getTypeAllocSize(EltTy);
   unsigned alignment = std::min(4U, EltSize);
   Constant *alignmentVal = OP->GetI32Const(alignment);
@@ -4276,7 +4275,6 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
     Value *resultElts[4];
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
 
-    // BEGIN GenerateRawBufLd
     Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
     Value *Args[] = {OP->GetU32Const((unsigned)opcode),
                      helper.handle,
@@ -4292,7 +4290,6 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
     // status
     UpdateStatus(Ld, helper.status, Builder, OP);
-    // END GenerateRawBufLd
     bufLds.emplace_back(Ld);
 
     for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
@@ -4300,6 +4297,96 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
     if (i < numComponents)
       bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
+  }
+
+  // If the expected return type is scalar then skip building a vector
+  if (isScalarTy) {
+    retValNew = elts[0];
+  } else {
+    retValNew = HLMatrixLower::BuildVector(EltTy, elts, Builder);
+  }
+
+  DXASSERT_NOMSG(!bufLds.empty());
+  dxilutil::MigrateDebugValue(helper.retVal, bufLds.front());
+
+  if (isBool) {
+    // Convert result back to register representation.
+    retValNew = Builder.CreateICmpNE(
+        retValNew, Constant::getNullValue(retValNew->getType()));
+  }
+
+  helper.retVal->replaceAllUsesWith(retValNew);
+  helper.retVal = retValNew;
+}
+
+void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
+                            IRBuilder<> &Builder, hlsl::OP *OP,
+                            const DataLayout &DL) {
+  Type *Ty = helper.retVal->getType();
+  Type *EltTy = Ty->getScalarType();
+  unsigned numComponents = 1;
+  DXASSERT(helper.opcode == OP::OpCode::RawBufferLoad,
+           "rawbufload with wrong helper opcode");
+
+  if (Ty->isVectorTy()) {
+    numComponents = Ty->getVectorNumElements();
+  }
+
+  std::vector<Value *> bufLds;
+  const bool isBool = EltTy->isIntegerTy(1);
+
+  // Bool are represented as i32 in memory
+  EltTy = isBool ? Builder.getInt32Ty() : EltTy;
+  bool isScalarTy = !Ty->isVectorTy();
+
+  Value *retValNew = nullptr;
+  // BEGIN TranslateRawBufVecLd
+  unsigned EltSize = DL.getTypeAllocSize(EltTy);
+  unsigned alignment = std::min(8U, EltSize);
+  Constant *alignmentVal = OP->GetI32Const(alignment);
+
+  Value *bufIdx = helper.addr;
+  Value *offset = OP->GetU32Const(0);
+
+  std::vector<Value *> elts(numComponents);
+  OP::OpCode opcode = OP::OpCode::RawBufferLoad;
+
+  for (unsigned i = 0; i < numComponents;) {
+    Value *ResultElts[4];
+    unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
+    // BEGIN GenerateRawBufLd
+    if (bufIdx == nullptr) {
+      // This is a templated byte address buffer load with a struct param.
+      // The call takes only one coordinates for the offset.
+      // Should look into this more closely.
+      bufIdx = offset;
+      offset = UndefValue::get(offset->getType());
+    }
+
+    Function *dxilF = OP->GetOpFunc(opcode, EltTy);
+    Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
+    Value *Args[] = {OP->GetU32Const((unsigned)opcode),
+                     helper.handle,
+                     bufIdx,
+                     offset,
+                     mask,
+                     alignmentVal};
+    Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
+
+    for (unsigned i = 0; i < chunkSize; i++) {
+      ResultElts[i] = Builder.CreateExtractValue(Ld, i);
+    }
+
+    // status
+    UpdateStatus(Ld, helper.status, Builder, OP);
+    // END GenerateRawBufLd
+    bufLds.emplace_back(Ld);
+
+    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
+      elts[i++] = ResultElts[j];
+
+    if (i < numComponents)
+      offset = Builder.CreateAdd(offset, OP->GetU32Const(4 * EltSize));
   }
 
   // If the expected return type is scalar then skip building a vector
@@ -4337,6 +4424,9 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   if (DXIL::IsRawBuffer(RK)) {
     TranslateRawBufLoad(helper, RK, Builder, OP, DL);
+    return;
+  } else if (DXIL::IsStructuredBuffer(RK)) {
+    TranslateStructBufLoad(helper, RK, Builder, OP, DL);
     return;
   }
 
