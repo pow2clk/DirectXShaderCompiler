@@ -1,10 +1,10 @@
 // RUN: %dxc -DTYPE=float4    -DIX=SIx -T vs_6_6 %s | FileCheck %s
-// RUiN: %dxc -DTYPE=bool4     -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,I1
+// RUN: %dxc -DTYPE=bool4     -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,I1
 // RUN: %dxc -DTYPE=uint64_t2 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,I64
 // RUN: %dxc -DTYPE=double2   -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,F64
 
 // RUN: %dxc -DTYPE=float4    -DIX=VIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,VIX
-// RUiN: %dxc -DTYPE=bool4     -DIX=VIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,VIX,I1
+// RUN: %dxc -DTYPE=bool4     -DIX=VIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,VIX,I1
 // RUN: %dxc -DTYPE=uint64_t2 -DIX=VIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,VIX,I64
 // RUN: %dxc -DTYPE=double2   -DIX=VIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,VIX,F64
 
