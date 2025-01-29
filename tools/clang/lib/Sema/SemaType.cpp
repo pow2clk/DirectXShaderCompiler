@@ -2217,7 +2217,7 @@ QualType Sema::BuildExtVectorType(QualType T, Expr *ArraySize,
 }
 
 bool Sema::CheckFunctionReturnType(QualType T, SourceLocation Loc) {
-  if (T->isArrayType() || T->isFunctionType()) {
+  if ((!getLangOpts().HLSL && T->isArrayType()) || T->isFunctionType()) {
     Diag(Loc, diag::err_func_returning_array_function)
       << T->isFunctionType() << T;
     return true;

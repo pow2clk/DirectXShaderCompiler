@@ -37,9 +37,9 @@ void main() : SV_Target {
 
   // DIAG: deduced conflicting types for parameter
   ternary_or(bb, sa);
-  // DIAG: function cannot return array type
-  ternary_or(iarra, iarrb);
 
+  // DIAG: error: scalar, vector, or matrix expected
+  ternary_or(iarra, iarrb);
   // DIAG: error: scalar, vector, or matrix expected
   ternary_and(sa, sb);
   // DIAG: error: scalar, vector, or matrix expected

@@ -54,17 +54,6 @@ int4 main(int4 a:A) : SV_Target {
 
   // DIAG-NOT: define void @main
 
-  // DIAG: function cannot return array type
-  // DIAG: function cannot return array type
-  // DIAG: function cannot return array type
-  // DIAG: function cannot return array type
-  // DIAG: function cannot return array type
-  Not(iarr);
-  And(iarr,iarr);
-  Or(iarr,iarr);
-  lshift(iarr,i);
-  rshift(iarr,i);
-
   // DIAG: error: scalar, vector, or matrix expected
   // DIAG: error: scalar, vector, or matrix expected
   // DIAG: error: scalar, vector, or matrix expected
@@ -75,6 +64,17 @@ int4 main(int4 a:A) : SV_Target {
   Or(s,s);
   lshift(s,i);
   rshift(s,i);
+
+  // DIAG: error: scalar, vector, or matrix expected
+  // DIAG: error: scalar, vector, or matrix expected
+  // DIAG: error: scalar, vector, or matrix expected
+  // DIAG: error: scalar, vector, or matrix expected
+  // DIAG: error: scalar, vector, or matrix expected
+  Not(iarr);
+  And(iarr,iarr);
+  Or(iarr,iarr);
+  lshift(iarr,i);
+  rshift(iarr,i);
 
   // DIAG: error: int or unsigned int type required
   // DIAG: error: int or unsigned int type required

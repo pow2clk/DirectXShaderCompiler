@@ -131,11 +131,10 @@ void main() : SV_Target {
 
   // DIAG-NOT: define void @main
 
-  // DIAG: function cannot return array type
-  preinc(f4arr);
-
+  // DIAG: error: scalar, vector, or matrix expected
   // DIAG: error: scalar, vector, or matrix expected
   preinc(s);
+  preinc(f4arr);
 
   // DIAG: error: operator cannot be used with a bool lvalue
   // DIAG: error: operator cannot be used with a bool lvalue
