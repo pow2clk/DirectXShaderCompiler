@@ -4272,7 +4272,6 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   Value *undefOffset = UndefValue::get(bufIdx->getType());
 
   for (unsigned i = 0; i < numComponents;) {
-    Value *resultElts[4];
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
 
     Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
@@ -4284,16 +4283,12 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
                      alignmentVal};
     Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
 
-    for (unsigned i = 0; i < chunkSize; i++) {
-      resultElts[i] = Builder.CreateExtractValue(Ld, i);
-    }
+    for (unsigned j = 0; j < chunkSize; j++)
+      elts[i++] = Builder.CreateExtractValue(Ld, j);
 
     // status
     UpdateStatus(Ld, helper.status, Builder, OP);
     bufLds.emplace_back(Ld);
-
-    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
-      elts[i++] = resultElts[j];
 
     if (i < numComponents)
       bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
@@ -4352,7 +4347,6 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   OP::OpCode opcode = OP::OpCode::RawBufferLoad;
 
   for (unsigned i = 0; i < numComponents;) {
-    Value *ResultElts[4];
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
     // BEGIN GenerateRawBufLd
     if (bufIdx == nullptr) {
@@ -4373,17 +4367,13 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
                      alignmentVal};
     Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
 
-    for (unsigned i = 0; i < chunkSize; i++) {
-      ResultElts[i] = Builder.CreateExtractValue(Ld, i);
-    }
+    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
+      elts[i++] = Builder.CreateExtractValue(Ld, j);
 
     // status
     UpdateStatus(Ld, helper.status, Builder, OP);
     // END GenerateRawBufLd
     bufLds.emplace_back(Ld);
-
-    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
-      elts[i++] = ResultElts[j];
 
     if (i < numComponents)
       offset = Builder.CreateAdd(offset, OP->GetU32Const(4 * EltSize));
@@ -4496,15 +4486,12 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
   }
 
   Value *ResRet = Builder.CreateCall(F, loadArgs, OP->GetOpCodeName(opcode));
-  dxilutil::MigrateDebugValue(helper.retVal, ResRet);
 
   Value *retValNew = nullptr;
   if (!is64) {
     retValNew = ScalarizeResRet(Ty, ResRet, Builder);
   } else {
-    unsigned size = numComponents;
-    DXASSERT(size <= 2, "typed buffer only allow 4 dwords");
-    EltTy = Ty->getScalarType();
+    DXASSERT(numComponents <= 2, "typed buffer only allow 4 dwords");
     Value *Elts[2];
 
     Make64bitResultForLoad(Ty->getScalarType(),
@@ -4514,11 +4501,12 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
                                Builder.CreateExtractValue(ResRet, 2),
                                Builder.CreateExtractValue(ResRet, 3),
                            },
-                           size, Elts, OP, Builder);
+                           numComponents, Elts, OP, Builder);
 
     retValNew = ScalarizeElements(Ty, Elts, Builder);
   }
 
+  dxilutil::MigrateDebugValue(helper.retVal, ResRet);
   if (isBool) {
     // Convert result back to register representation.
     retValNew = Builder.CreateICmpNE(
