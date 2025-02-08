@@ -4441,45 +4441,8 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
     numComponents = Ty->getVectorNumElements();
   }
 
-  if (DXIL::IsStructuredBuffer(RK) || DXIL::IsRawBuffer(RK)) {
-    std::vector<Value *> bufLds;
-    const bool isBool = EltTy->isIntegerTy(1);
-
-    // Bool are represented as i32 in memory
-    Type *MemReprTy = isBool ? Builder.getInt32Ty() : EltTy;
-    bool isScalarTy = !Ty->isVectorTy();
-
-    Value *retValNew = nullptr;
-    if (DXIL::IsStructuredBuffer(RK)) {
-      retValNew = TranslateRawBufVecLd(
-          MemReprTy, numComponents, Builder, helper.handle, OP, helper.status,
-          helper.addr, OP->GetU32Const(0), DL, bufLds,
-          /*baseAlign (in bytes)*/ 8, isScalarTy);
-    } else {
-      retValNew =
-          TranslateRawBufVecLd(MemReprTy, numComponents, Builder, helper.handle,
-                               OP, helper.status, nullptr, helper.addr, DL,
-                               bufLds, /*baseAlign (in bytes)*/ 4, isScalarTy);
-    }
-
-    DXASSERT_NOMSG(!bufLds.empty());
-    dxilutil::MigrateDebugValue(helper.retVal, bufLds.front());
-
-    if (isBool) {
-      // Convert result back to register representation.
-      retValNew = Builder.CreateICmpNE(
-          retValNew, Constant::getNullValue(retValNew->getType()));
-    }
-
-    helper.retVal->replaceAllUsesWith(retValNew);
-    helper.retVal = retValNew;
-    return;
-  }
-
-  bool isTyped = opcode == OP::OpCode::TextureLoad ||
-                 RK == DxilResource::Kind::TypedBuffer;
   bool is64 = EltTy == i64Ty || EltTy == doubleTy;
-  if (is64 && isTyped) {
+  if (is64) {
     EltTy = i32Ty;
   }
   bool isBool = EltTy->isIntegerTy(1);
@@ -4536,7 +4499,7 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
   dxilutil::MigrateDebugValue(helper.retVal, ResRet);
 
   Value *retValNew = nullptr;
-  if (!is64 || !isTyped) {
+  if (!is64) {
     retValNew = ScalarizeResRet(Ty, ResRet, Builder);
   } else {
     unsigned size = numComponents;
