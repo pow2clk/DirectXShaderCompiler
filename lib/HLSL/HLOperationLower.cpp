@@ -3107,9 +3107,10 @@ static Value *ScalarizeResRet(Type *RetTy, Value *ResRet,
 static Value *ScalarizeElements(Type *RetTy, ArrayRef<Value *> Elts,
                                 IRBuilder<> &Builder) {
   // Extract value part.
-  Value *retVal = llvm::UndefValue::get(RetTy);
+  Value *retVal = nullptr;
   if (RetTy->isVectorTy()) {
     unsigned vecSize = RetTy->getVectorNumElements();
+    retVal = UndefValue::get(VectorType::get(Elts[0]->getType(), vecSize));
     DXASSERT(vecSize <= Elts.size(), "vector size mismatch");
     for (unsigned i = 0; i < vecSize; i++) {
       Value *retComp = Elts[i];
@@ -4253,7 +4254,6 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   // Bool are represented as i32 in memory
   EltTy = isBool ? Builder.getInt32Ty() : EltTy;
-  bool isScalarTy = !Ty->isVectorTy();
 
   Value *retValNew = nullptr;
   unsigned EltSize = DL.getTypeAllocSize(EltTy);
@@ -4294,12 +4294,7 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
       bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
   }
 
-  // If the expected return type is scalar then skip building a vector
-  if (isScalarTy) {
-    retValNew = elts[0];
-  } else {
-    retValNew = HLMatrixLower::BuildVector(EltTy, elts, Builder);
-  }
+  retValNew = ScalarizeElements(Ty, elts, Builder);
 
   DXASSERT_NOMSG(!bufLds.empty());
   dxilutil::MigrateDebugValue(helper.retVal, bufLds.front());
@@ -4332,7 +4327,6 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   // Bool are represented as i32 in memory
   EltTy = isBool ? Builder.getInt32Ty() : EltTy;
-  bool isScalarTy = !Ty->isVectorTy();
 
   Value *retValNew = nullptr;
   // BEGIN TranslateRawBufVecLd
@@ -4379,12 +4373,8 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
       offset = Builder.CreateAdd(offset, OP->GetU32Const(4 * EltSize));
   }
 
-  // If the expected return type is scalar then skip building a vector
-  if (isScalarTy) {
-    retValNew = elts[0];
-  } else {
-    retValNew = HLMatrixLower::BuildVector(EltTy, elts, Builder);
-  }
+  retValNew = ScalarizeElements(Ty, elts, Builder);
+
   // END TranslateRawBufVecLd
 
   DXASSERT_NOMSG(!bufLds.empty());
