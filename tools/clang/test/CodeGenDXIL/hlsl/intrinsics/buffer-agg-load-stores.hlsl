@@ -3,6 +3,16 @@
 // RUN: %dxc -DARR -DTYPE=uint64_t -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
 // RUN: %dxc -DARR -DTYPE=double   -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
 
+// RUN: %dxc -DARR -DTYPE=float1    -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=bool1     -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=uint64_t1 -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=double1   -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+
+// RUN: %dxc -DARR -DTYPE=float4    -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=bool4     -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=uint64_t4 -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DARR -DTYPE=double4   -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+
 // RUN: %dxc -DMAT -DTYPE=float    -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
 // RUN: %dxc -DMAT -DTYPE=uint64_t -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
 // RUN: %dxc -DMAT -DTYPE=double   -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
@@ -10,6 +20,14 @@
 // RUN: %dxc -DMAT -DTYPE=bool     -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
 // RUN: %dxc -DMAT -DTYPE=uint64_t -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
 // RUN: %dxc -DMAT -DTYPE=double   -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
+
+// RUN: %dxc -DSMAT -DTYPE=float    -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DSMAT -DTYPE=uint64_t -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DSMAT -DTYPE=double   -DNUM=2 -DIX=SIx -T vs_6_6 %s | FileCheck %s
+// RUN: %dxc -DSMAT -DTYPE=float    -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
+// RUN: %dxc -DSMAT -DTYPE=bool     -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
+// RUN: %dxc -DSMAT -DTYPE=uint64_t -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
+// RUN: %dxc -DSMAT -DTYPE=double   -DNUM=3 -DIX=SIx -T vs_6_6 %s | FileCheck %s --check-prefixes=CHECK,MAT
 
 // RUN: %dxc -DTYPE=float    -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
 // RUN: %dxc -DTYPE=bool     -DNUM=4 -DIX=SIx -T vs_6_6 %s | FileCheck %s
@@ -46,6 +64,9 @@
 #elif defined(MAT)
 #define TYNAME(T,N) matrix< T, N, N >
 #define DECL(T,N,V) matrix< T, N, N > V
+#elif defined(SMAT)
+#define TYNAME(T,N) Matrix< T, N, N >
+#define DECL(T,N,V) Matrix< T, N, N > V
 #elif defined(OFF)
 #define TYNAME(T,N) OffVector< T, N >
 #define DECL(T,N,V) OffVector< T, N > V
@@ -53,6 +74,16 @@
 #define TYNAME(T,N) Vector< T, N >
 #define DECL(T,N,V) Vector< T, N > V
 #endif
+
+template<typename T, int N, int M>
+struct Matrix {
+  matrix<T, N, M> m;
+  Matrix operator+(Matrix mat) {
+    Matrix ret;
+    ret.m = m + mat.m;
+    return ret;
+  }
+};
 
 template<typename T, int N>
 struct Vector {
