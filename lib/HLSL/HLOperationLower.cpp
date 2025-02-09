@@ -8347,13 +8347,16 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
       }
       userCall->eraseFromParent();
     } else if (group == HLOpcodeGroup::HLMatLoadStore)
+      // Load/Store matrix within a struct
       TranslateStructBufMatLdSt(userCall, handle, OP, status, bufIdx,
                                 baseOffset, DL);
     else if (group == HLOpcodeGroup::HLSubscript) {
+      // Subscript of matrix within a struct
       TranslateStructBufMatSubscript(userCall, handle, ResKind, bufIdx,
                                      baseOffset, status, OP, DL);
     }
   } else if (isa<LoadInst>(user) || isa<StoreInst>(user)) {
+    // Load/Store of scalar/vector within a struct.
     LoadInst *ldInst = dyn_cast<LoadInst>(user);
     StoreInst *stInst = dyn_cast<StoreInst>(user);
 
