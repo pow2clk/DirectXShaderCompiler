@@ -4390,25 +4390,10 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   helper.retVal = retValNew;
 }
 
-void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
-                   IRBuilder<> &Builder, hlsl::OP *OP, const DataLayout &DL) {
-
+void TranslateTypedLoad(ResLoadHelper &helper, HLResource::Kind RK,
+                        IRBuilder<> &Builder, hlsl::OP *OP,
+                        const DataLayout &DL) {
   Type *Ty = helper.retVal->getType();
-  if (Ty->isPointerTy()) {
-    DXASSERT(!DxilResource::IsAnyTexture(RK),
-             "Textures should not be treated as structured buffers.");
-    TranslateStructBufSubscript(cast<CallInst>(helper.retVal), helper.handle,
-                                helper.status, OP, RK, DL);
-    return;
-  }
-
-  if (DXIL::IsRawBuffer(RK)) {
-    TranslateRawBufLoad(helper, RK, Builder, OP, DL);
-    return;
-  } else if (DXIL::IsStructuredBuffer(RK)) {
-    TranslateStructBufLoad(helper, RK, Builder, OP, DL);
-    return;
-  }
 
   OP::OpCode opcode = helper.opcode;
 
@@ -4547,7 +4532,22 @@ Value *TranslateResourceLoad(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
   DXIL::ResourceKind RK = pObjHelper->GetRK(handle);
 
   ResLoadHelper loadHelper(CI, RK, RC, handle, IOP);
-  TranslateLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+  Type *Ty = CI->getType();
+  if (Ty->isPointerTy()) {
+    // If type is a struct, GEPs and Loads are used to
+    // access the member offsets similar to subscripts,
+    // so we reuse the subscript handling code.
+    DXASSERT(!DxilResource::IsAnyTexture(RK),
+             "Textures should not be treated as structured buffers.");
+    TranslateStructBufSubscript(CI, loadHelper.handle, loadHelper.status,
+                                hlslOP, RK, helper.dataLayout);
+  } else if (DXIL::IsRawBuffer(RK)) {
+    TranslateRawBufLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+  } else if (DXIL::IsStructuredBuffer(RK)) {
+    TranslateStructBufLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+  } else {
+    TranslateTypedLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+  }
   // CI is replaced in TranslateLoad.
   return nullptr;
 }
@@ -8620,7 +8620,7 @@ Value *TranslateTypedBufLoad(CallInst *CI, DXIL::ResourceKind RK,
     ldHelper.mipLevel = hlslOP->GetU32Const(0);
   // use ldInst as retVal
   ldHelper.retVal = ldInst;
-  TranslateLoad(ldHelper, RK, Builder, hlslOP, DL);
+  TranslateTypedLoad(ldHelper, RK, Builder, hlslOP, DL);
   // delete the ld
   ldInst->eraseFromParent();
   return ldHelper.retVal;
@@ -8898,7 +8898,7 @@ void TranslateHLSubscript(CallInst *CI, HLSubscriptOpcode opcode,
     IRBuilder<> Builder(CI);
     if (LoadInst *ldInst = dyn_cast<LoadInst>(*U)) {
       ResLoadHelper ldHelper(ldInst, handle, coord, mipLevel);
-      TranslateLoad(ldHelper, RK, Builder, hlslOP, helper.dataLayout);
+      TranslateTypedLoad(ldHelper, RK, Builder, hlslOP, helper.dataLayout);
       ldInst->eraseFromParent();
     } else {
       StoreInst *stInst = cast<StoreInst>(*U);
