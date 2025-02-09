@@ -4238,7 +4238,6 @@ static Value *TranslateRawBufVecLd(Type *VecEltTy, unsigned VecElemCount,
 void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
                          IRBuilder<> &Builder, hlsl::OP *OP,
                          const DataLayout &DL) {
-
   Type *Ty = helper.retVal->getType();
   Type *EltTy = Ty->getScalarType();
   unsigned numComponents = 1;
@@ -4261,15 +4260,11 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   Constant *alignmentVal = OP->GetI32Const(alignment);
 
   Value *bufIdx = helper.addr;
-  // DELETE: does this happen? Maybe only when lowering subscript users.
-  if (bufIdx == nullptr) {
-    bufIdx = OP->GetU32Const(0);
-  }
+  Value *offset = UndefValue::get(bufIdx->getType());
 
   std::vector<Value *> elts(numComponents);
   OP::OpCode opcode = OP::OpCode::RawBufferLoad;
   Function *dxilF = OP->GetOpFunc(opcode, EltTy);
-  Value *undefOffset = UndefValue::get(bufIdx->getType());
 
   for (unsigned i = 0; i < numComponents;) {
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
@@ -4278,7 +4273,7 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
     Value *Args[] = {OP->GetU32Const((unsigned)opcode),
                      helper.handle,
                      bufIdx,
-                     undefOffset,
+                     offset,
                      mask,
                      alignmentVal};
     Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
@@ -4339,19 +4334,11 @@ void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   std::vector<Value *> elts(numComponents);
   OP::OpCode opcode = OP::OpCode::RawBufferLoad;
+  Function *dxilF = OP->GetOpFunc(opcode, EltTy);
 
   for (unsigned i = 0; i < numComponents;) {
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
     // BEGIN GenerateRawBufLd
-    if (bufIdx == nullptr) {
-      // This is a templated byte address buffer load with a struct param.
-      // The call takes only one coordinates for the offset.
-      // Should look into this more closely.
-      bufIdx = offset;
-      offset = UndefValue::get(offset->getType());
-    }
-
-    Function *dxilF = OP->GetOpFunc(opcode, EltTy);
     Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
     Value *Args[] = {OP->GetU32Const((unsigned)opcode),
                      helper.handle,
