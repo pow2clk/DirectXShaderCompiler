@@ -4421,12 +4421,13 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
     numComponents = Ty->getVectorNumElements();
   }
 
-  bool is64 = EltTy == i64Ty || EltTy == doubleTy;
-  if (is64) {
+  bool is64 = false;
+  bool isBool = false;
+  if (EltTy == i64Ty || EltTy == doubleTy) {
+    is64 = true;
     EltTy = i32Ty;
-  }
-  bool isBool = EltTy->isIntegerTy(1);
-  if (isBool) {
+  } else if (EltTy->isIntegerTy(1)) {
+    isBool = true;
     // Value will be loaded in its memory representation.
     EltTy = i32Ty;
     if (Ty->isVectorTy())
@@ -4477,23 +4478,45 @@ void TranslateLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   Value *ResRet = Builder.CreateCall(F, loadArgs, OP->GetOpCodeName(opcode));
 
-  Value *retValNew = nullptr;
+  Value *Elts[4];
   if (!is64) {
-    retValNew = ScalarizeResRet(Ty, ResRet, Builder);
+    Elts[0] = Builder.CreateExtractValue(ResRet, 0);
+    if (Ty->isVectorTy())
+      for (unsigned i = 1; i < Ty->getVectorNumElements(); i++)
+        Elts[i] = Builder.CreateExtractValue(ResRet, i);
   } else {
     DXASSERT(numComponents <= 2, "typed buffer only allow 4 dwords");
-    Value *Elts[2];
-
-    Make64bitResultForLoad(Ty->getScalarType(),
-                           {
-                               Builder.CreateExtractValue(ResRet, 0),
-                               Builder.CreateExtractValue(ResRet, 1),
-                               Builder.CreateExtractValue(ResRet, 2),
-                               Builder.CreateExtractValue(ResRet, 3),
-                           },
-                           numComponents, Elts, OP, Builder);
-
-    retValNew = ScalarizeElements(Ty, Elts, Builder);
+    if (Ty->getScalarType() == doubleTy) {
+      Function *makeDouble = OP->GetOpFunc(DXIL::OpCode::MakeDouble, doubleTy);
+      Value *makeDoubleOpArg =
+          Builder.getInt32((unsigned)DXIL::OpCode::MakeDouble);
+      for (unsigned i = 0; i < numComponents; i++) {
+        Value *lo = Builder.CreateExtractValue(ResRet, 2 * i);
+        Value *hi = Builder.CreateExtractValue(ResRet, 2 * i + 1);
+        Value *V = Builder.CreateCall(makeDouble, {makeDoubleOpArg, lo, hi});
+        Elts[i] = V;
+      }
+    } else {
+      for (unsigned i = 0; i < numComponents; i++) {
+        Value *lo = Builder.CreateExtractValue(ResRet, 2 * i);
+        Value *hi = Builder.CreateExtractValue(ResRet, 2 * i + 1);
+        lo = Builder.CreateZExt(lo, i64Ty);
+        hi = Builder.CreateZExt(hi, i64Ty);
+        hi = Builder.CreateShl(hi, 32);
+        Elts[i] = Builder.CreateOr(lo, hi);
+      }
+    }
+  }
+  Value *retValNew = nullptr;
+  if (Ty->isVectorTy()) {
+    unsigned vecSize = Ty->getVectorNumElements();
+    retValNew = UndefValue::get(VectorType::get(Elts[0]->getType(), vecSize));
+    for (unsigned i = 0; i < vecSize; i++) {
+      Value *retComp = Elts[i];
+      retValNew = Builder.CreateInsertElement(retValNew, retComp, i);
+    }
+  } else {
+    retValNew = Elts[0];
   }
 
   dxilutil::MigrateDebugValue(helper.retVal, ResRet);
