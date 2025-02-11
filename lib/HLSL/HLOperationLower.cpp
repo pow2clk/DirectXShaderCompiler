@@ -4238,7 +4238,7 @@ static Value *TranslateRawBufVecLd(Type *VecEltTy, unsigned VecElemCount,
                                    unsigned baseAlign, bool isScalarTy = false);
 
 void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
-                         IRBuilder<> &Builder, hlsl::OP *OP,
+                         Value *offset, IRBuilder<> &Builder, hlsl::OP *OP,
                          const DataLayout &DL) {
   Type *Ty = helper.Ty;
   Type *EltTy = Ty->getScalarType();
@@ -4258,11 +4258,11 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   Value *retValNew = nullptr;
   unsigned EltSize = DL.getTypeAllocSize(EltTy);
-  unsigned alignment = std::min(4U, EltSize);
+  unsigned alignment = RK == DxilResource::Kind::RawBuffer ? 4U : 8U;
+  alignment = std::min(alignment, EltSize);
   Constant *alignmentVal = OP->GetI32Const(alignment);
 
   Value *bufIdx = helper.addr;
-  Value *offset = UndefValue::get(bufIdx->getType());
 
   std::vector<Value *> elts(numComponents);
   OP::OpCode opcode = OP::OpCode::RawBufferLoad;
@@ -4286,79 +4286,12 @@ void TranslateRawBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
     UpdateStatus(Ld, helper.status, Builder, OP);
     bufLds.emplace_back(Ld);
 
-    if (i < numComponents)
-      bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
-  }
-
-  retValNew = ScalarizeElements(Ty, elts, Builder);
-
-  DXASSERT_NOMSG(!bufLds.empty());
-  dxilutil::MigrateDebugValue(helper.retVal, bufLds.front());
-
-  if (isBool) {
-    // Convert result back to register representation.
-    retValNew = Builder.CreateICmpNE(
-        retValNew, Constant::getNullValue(retValNew->getType()));
-  }
-
-  helper.retVal->replaceAllUsesWith(retValNew);
-  helper.retVal = retValNew;
-}
-
-void TranslateStructBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
-                            IRBuilder<> &Builder, hlsl::OP *OP,
-                            const DataLayout &DL) {
-  Type *Ty = helper.Ty;
-  Type *EltTy = Ty->getScalarType();
-  unsigned numComponents = 1;
-  DXASSERT(helper.opcode == OP::OpCode::RawBufferLoad,
-           "rawbufload with wrong helper opcode");
-
-  if (Ty->isVectorTy()) {
-    numComponents = Ty->getVectorNumElements();
-  }
-
-  std::vector<Value *> bufLds;
-  const bool isBool = EltTy->isIntegerTy(1);
-
-  // Bool are represented as i32 in memory
-  EltTy = isBool ? Builder.getInt32Ty() : EltTy;
-
-  Value *retValNew = nullptr;
-  // BEGIN TranslateRawBufVecLd
-  unsigned EltSize = DL.getTypeAllocSize(EltTy);
-  unsigned alignment = std::min(8U, EltSize);
-  Constant *alignmentVal = OP->GetI32Const(alignment);
-
-  Value *bufIdx = helper.addr;
-  Value *offset = OP->GetU32Const(0);
-
-  std::vector<Value *> elts(numComponents);
-  OP::OpCode opcode = OP::OpCode::RawBufferLoad;
-  Function *dxilF = OP->GetOpFunc(opcode, EltTy);
-
-  for (unsigned i = 0; i < numComponents;) {
-    unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
-    // BEGIN GenerateRawBufLd
-    Constant *mask = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
-    Value *Args[] = {OP->GetU32Const((unsigned)opcode),
-                     helper.handle,
-                     bufIdx,
-                     offset,
-                     mask,
-                     alignmentVal};
-    Value *Ld = Builder.CreateCall(dxilF, Args, OP::GetOpCodeName(opcode));
-
-    for (unsigned j = 0; i < numComponents && j < chunkSize; j++)
-      elts[i++] = Builder.CreateExtractValue(Ld, j);
-
-    // status
-    UpdateStatus(Ld, helper.status, Builder, OP);
-    // END GenerateRawBufLd
-    bufLds.emplace_back(Ld);
-
-    if (i < numComponents)
-      offset = Builder.CreateAdd(offset, OP->GetU32Const(4 * EltSize));
+    if (i < numComponents) {
+      if (RK == DxilResource::Kind::RawBuffer)
+        bufIdx = Builder.CreateAdd(bufIdx, OP->GetU32Const(4 * EltSize));
+      else
+        offset = Builder.CreateAdd(offset, OP->GetU32Const(4 * EltSize));
+    }
   }
 
   retValNew = ScalarizeElements(Ty, elts, Builder);
@@ -4530,9 +4463,12 @@ Value *TranslateResourceLoad(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
     TranslateStructBufSubscript(CI, loadHelper.handle, loadHelper.status,
                                 hlslOP, RK, helper.dataLayout);
   } else if (DXIL::IsRawBuffer(RK)) {
-    TranslateRawBufLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+    TranslateRawBufLoad(loadHelper, RK,
+                        UndefValue::get(Type::getInt32Ty(Ty->getContext())),
+                        Builder, hlslOP, helper.dataLayout);
   } else if (DXIL::IsStructuredBuffer(RK)) {
-    TranslateStructBufLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
+    TranslateRawBufLoad(loadHelper, RK, hlslOP->GetU32Const(0), Builder, hlslOP,
+                        helper.dataLayout);
   } else {
     TranslateTypedLoad(loadHelper, RK, Builder, hlslOP, helper.dataLayout);
   }
