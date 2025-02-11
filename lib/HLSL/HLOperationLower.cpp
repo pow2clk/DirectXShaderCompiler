@@ -8382,24 +8382,28 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
 
     Value *val = stInst->getValueOperand();
     Value *undefVal = llvm::UndefValue::get(pOverloadTy);
-    Value *vals[] = {undefVal, undefVal, undefVal, undefVal};
-    uint8_t mask = 0;
-    if (Ty->isVectorTy()) {
-      unsigned vectorNumElements = Ty->getVectorNumElements();
-      DXASSERT(vectorNumElements <= 4, "up to 4 elements in vector");
-      assert(vectorNumElements <= 4);
-      for (unsigned i = 0; i < vectorNumElements; i++) {
-        vals[i] = Builder.CreateExtractElement(val, i);
-        mask |= (1 << i);
-      }
-    } else {
-      vals[0] = val;
-      mask = DXIL::kCompMask_X;
-    }
+    unsigned numComponents = 1;
+    if (Ty->isVectorTy())
+      numComponents = Ty->getVectorNumElements();
     Constant *alignment =
         OP->GetI32Const(DL.getTypeAllocSize(Ty->getScalarType()));
-    GenerateStructBufSt(handle, bufIdx, offset, pOverloadTy, OP, Builder, vals,
-                        mask, alignment);
+    for (unsigned i = 0; i < numComponents;) {
+      Value *vals[] = {undefVal, undefVal, undefVal, undefVal};
+      uint8_t mask = 0;
+      unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
+      if (Ty->isVectorTy()) {
+        for (unsigned j = 0; j < chunkSize; j++, i++) {
+          vals[j] = Builder.CreateExtractElement(val, i);
+          mask |= (1 << j);
+        }
+      } else {
+        vals[0] = val;
+        mask = DXIL::kCompMask_X;
+        i++;
+      }
+      GenerateStructBufSt(handle, bufIdx, offset, pOverloadTy, OP, Builder,
+                          vals, mask, alignment);
+    }
     stInst->eraseFromParent();
   } else if (BitCastInst *BCI = dyn_cast<BitCastInst>(user)) {
     // Recurse users
