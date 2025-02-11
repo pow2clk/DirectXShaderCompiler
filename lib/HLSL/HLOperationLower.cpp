@@ -4060,14 +4060,40 @@ TranslateWriteSamplerFeedback(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
 }
 
 // Load/Store intrinsics.
+OP::OpCode LoadOpFromResKind(DxilResource::Kind RK) {
+  switch (RK) {
+  case DxilResource::Kind::RawBuffer:
+  case DxilResource::Kind::StructuredBuffer:
+    return OP::OpCode::RawBufferLoad;
+  case DxilResource::Kind::TypedBuffer:
+    return OP::OpCode::BufferLoad;
+  case DxilResource::Kind::Invalid:
+    DXASSERT(0, "invalid resource kind");
+    break;
+  default:
+    return OP::OpCode::TextureLoad;
+  }
+  return OP::OpCode::TextureLoad;
+}
+
 struct ResLoadHelper {
+  // Default constructor uses CI load intrinsic call
+  //  to get the retval and various location indicators.
   ResLoadHelper(CallInst *CI, DxilResource::Kind RK, DxilResourceBase::Class RC,
                 Value *h, IntrinsicOp IOP, bool bForSubscript = false);
-  // For double subscript.
-  ResLoadHelper(Instruction *ldInst, Value *h, Value *idx, Value *mip)
-      : opcode(OP::OpCode::TextureLoad),
-        intrinsicOpCode(IntrinsicOp::Num_Intrinsics), handle(h), retVal(ldInst),
-        addr(idx), offset(nullptr), status(nullptr), mipLevel(mip) {}
+  // Alternative constructor explicitly sets the index.
+  // Used for some subscript operators.
+  ResLoadHelper(Instruction *ldInst, DxilResource::Kind RK, Value *h,
+                Value *idx, Value *mip = nullptr)
+      : intrinsicOpCode(IntrinsicOp::Num_Intrinsics), handle(h), retVal(ldInst),
+        addr(idx), offset(nullptr), status(nullptr), mipLevel(mip) {
+    opcode = LoadOpFromResKind(RK);
+    Type *i32Ty = IRBuilder<>(ldInst).getInt32Ty();
+    if (DXIL::IsStructuredBuffer(RK))
+      offset = ConstantInt::get(i32Ty, 0U);
+    else
+      offset = UndefValue::get(i32Ty);
+  }
   OP::OpCode opcode;
   IntrinsicOp intrinsicOpCode;
   unsigned dxilMajor;
@@ -4084,21 +4110,7 @@ ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
                              DxilResourceBase::Class RC, Value *hdl,
                              IntrinsicOp IOP, bool bForSubscript)
     : intrinsicOpCode(IOP), handle(hdl), offset(nullptr), status(nullptr) {
-  switch (RK) {
-  case DxilResource::Kind::RawBuffer:
-  case DxilResource::Kind::StructuredBuffer:
-    opcode = OP::OpCode::RawBufferLoad;
-    break;
-  case DxilResource::Kind::TypedBuffer:
-    opcode = OP::OpCode::BufferLoad;
-    break;
-  case DxilResource::Kind::Invalid:
-    DXASSERT(0, "invalid resource kind");
-    break;
-  default:
-    opcode = OP::OpCode::TextureLoad;
-    break;
-  }
+  opcode = LoadOpFromResKind(RK);
   retVal = CI;
   const unsigned kAddrIdx = HLOperandIndex::kBufLoadAddrOpIdx;
   addr = CI->getArgOperand(kAddrIdx);
@@ -4160,6 +4172,11 @@ ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
     const unsigned kStatusIdx = HLOperandIndex::kBufLoadStatusOpIdx;
     if (argc > kStatusIdx)
       status = CI->getArgOperand(kStatusIdx);
+    Type *i32Ty = IRBuilder<>(CI).getInt32Ty();
+    if (DXIL::IsStructuredBuffer(RK))
+      offset = ConstantInt::get(i32Ty, 0U);
+    else
+      offset = UndefValue::get(i32Ty);
   }
 }
 
@@ -8761,7 +8778,7 @@ void TranslateHLSubscript(CallInst *CI, HLSubscriptOpcode opcode,
     DXASSERT(CI->hasOneUse(), "subscript should only have one use");
     IRBuilder<> Builder(CI);
     if (LoadInst *ldInst = dyn_cast<LoadInst>(*U)) {
-      ResLoadHelper ldHelper(ldInst, handle, coord, mipLevel);
+      ResLoadHelper ldHelper(ldInst, RK, handle, coord, mipLevel);
       TranslateLoad(ldHelper, RK, Builder, hlslOP, helper.dataLayout);
       ldInst->eraseFromParent();
     } else {
