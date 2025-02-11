@@ -156,6 +156,12 @@ void main(uint SIx[2] : SIX, uint1 VIx[2] : VIX) {
   // CHECK-DAG: [[HDLROBY:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 1, i32 1, i32 0, i8 0 }, i32 1, i1 false)
   // CHECK-DAG: [[HDLRWBY:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 1, i32 1, i32 0, i8 1 }, i32 1, i1 false)
 
+  // CHECK-DAG: [[HDLROST:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 2, i32 2, i32 0, i8 0 }, i32 2, i1 false)
+  // CHECK-DAG: [[HDLRWST:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 2, i32 2, i32 0, i8 1 }, i32 2, i1 false)
+
+  // CHECK-DAG: [[HDLCON:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 4, i32 4, i32 0, i8 1 }, i32 4, i1 false)
+  // CHECK-DAG: [[HDLAPP:%.*]] = call %dx.types.Handle @dx.op.createHandleFromBinding(i32 217, %dx.types.ResBind { i32 5, i32 5, i32 0, i8 1 }, i32 5, i1 false)
+
   // CHECK-DAG: [[IX0:%.*]] = call i32 @dx.op.loadInput.i32(i32 4, i32 {{[0-9]*}}, i32 [[BOFF:0]]
   // CHECK-DAG: [[RIX0:%.*]] = call i32 @dx.op.loadInput.i32(i32 4, i32 {{[0-9]*}}, i32 [[BOFF]]
   
@@ -194,4 +200,79 @@ void main(uint SIx[2] : SIX, uint1 VIx[2] : VIX) {
   // MID: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLRWBY]], i32 [[IX0p8]], i32 undef
   RwByBuf.Store< TYNAME(TYPE,NUM) >(IX[0], Add(babElt1, babElt2));
 
+  // StructuredBuffer Tests
+  // CHECK: [[ANHDLRWST:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[HDLRWST]]
+  // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[BOFF]]
+  // MID:  call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[p4]], i8 15,
+  // MID:  call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[p8]], i8 1,
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  DECL(TYPE,NUM,stbElt1) = RwStBuf.Load(IX[0]);
+  // CHECK: [[IX1:%.*]] = call i32 @dx.op.loadInput.i32(i32 4,
+  // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX1]], i32 [[BOFF]]
+  // MID:  call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX1]], i32 [[p4]], i8 15,
+  // MID:  call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLRWST]], i32 [[IX1]], i32 [[p8]], i8 1,
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  DECL(TYPE,NUM,stbElt2) = RwStBuf[IX[1]];
+
+  // CHECK: [[ANHDLROST:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[HDLROST]]
+  // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX0]], i32 [[BOFF]]
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX0]], i32 [[p4]], i8 15,
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX0]], i32 [[p8]], i8 1,
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  DECL(TYPE,NUM,stbElt3) = RoStBuf.Load(IX[0]);
+  // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX1]], i32 [[BOFF]]
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX1]], i32 [[p4]], i8 15,
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLROST]], i32 [[IX1]], i32 [[p8]], i8 1,
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  DECL(TYPE,NUM,stbElt4) = RoStBuf[IX[1]];
+
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // OFF: call void @dx.op.rawBufferStore.f32(i32 140, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 0, float 0.0
+  // OFF: call void @dx.op.rawBufferStore.f64(i32 140, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 16, double 0.0
+  // CHECK: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[BOFF]]
+  // MID: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[p4]]
+  // MID: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLRWST]], i32 [[IX0]], i32 [[p8]]
+  RwStBuf[IX[0]] = Add(stbElt1, stbElt2, stbElt3, stbElt4);
+
+  // {Append/Consume}StructuredBuffer Tests
+  // CHECK: [[ANHDLCON:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[HDLCON]]
+  // CHECK: [[CONIX:%.*]] = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle [[ANHDLCON]], i8 -1) 
+  // OFF: call %dx.types.ResRet.f32 @dx.op.rawBufferLoad.f32(i32 139, %dx.types.Handle [[ANHDLCON]], i32 [[CONIX]], i32 
+  // OFF: call %dx.types.ResRet.f64 @dx.op.rawBufferLoad.f64(i32 139, %dx.types.Handle [[ANHDLCON]], i32 [[CONIX]], i32 16
+  // CHECK: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLCON]], i32 [[CONIX]], i32 [[BOFF]]
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLCON]], i32 [[CONIX]], i32 [[p4]], i8 15,
+  // MID: call %dx.types.ResRet.[[TY]] @dx.op.rawBufferLoad.[[TY]](i32 139, %dx.types.Handle [[ANHDLCON]], i32 [[CONIX]], i32 [[p8]], i8 1,
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  // I1: icmp ne i32 %{{.*}}, 0
+  DECL(TYPE,NUM,cnElt) = CnStBuf.Consume();
+
+  // CHECK: [[ANHDLAPP:%.*]] = call %dx.types.Handle @dx.op.annotateHandle(i32 216, %dx.types.Handle [[HDLAPP]]
+  // CHECK: [[APPIX:%.*]] = call i32 @dx.op.bufferUpdateCounter(i32 70, %dx.types.Handle [[ANHDLAPP]], i8 1) 
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // I1: zext i1 %{{.*}} to i32
+  // OFF: call void @dx.op.rawBufferStore.f32(i32 140, %dx.types.Handle [[ANHDLAPP]], i32 [[APPIX]], i32 0
+  // OFF: call void @dx.op.rawBufferStore.f64(i32 140, %dx.types.Handle [[ANHDLAPP]], i32 [[APPIX]], i32 16
+  // CHECK: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLAPP]], i32 [[APPIX]], i32 [[BOFF]]
+  // MID: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLAPP]], i32 [[APPIX]], i32 [[p4]]
+  // MID: call void @dx.op.rawBufferStore.[[TY]](i32 140, %dx.types.Handle [[ANHDLAPP]], i32 [[APPIX]], i32 [[p8]]
+  ApStBuf.Append(cnElt);
 }
