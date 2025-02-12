@@ -4094,6 +4094,7 @@ struct ResLoadHelper {
       offset = ConstantInt::get(i32Ty, 0U);
     else
       offset = UndefValue::get(i32Ty);
+    Ty = ldInst->getType();
   }
   OP::OpCode opcode;
   IntrinsicOp intrinsicOpCode;
@@ -4105,6 +4106,7 @@ struct ResLoadHelper {
   Value *offset;
   Value *status;
   Value *mipLevel;
+  Type *Ty;
 };
 
 ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
@@ -4113,6 +4115,7 @@ ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
     : intrinsicOpCode(IOP), handle(hdl), offset(nullptr), status(nullptr) {
   opcode = LoadOpFromResKind(RK);
   retVal = CI;
+  Ty = CI->getType();
   const unsigned kAddrIdx = HLOperandIndex::kBufLoadAddrOpIdx;
   addr = CI->getArgOperand(kAddrIdx);
   unsigned argc = CI->getNumArgOperands();
@@ -4256,7 +4259,7 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
                         IRBuilder<> &Builder, hlsl::OP *OP,
                         const DataLayout &DL) {
   // Collect information about the resource type.
-  Type *Ty = helper.retVal->getType();
+  Type *Ty = helper.Ty;
   Type *EltTy = Ty->getScalarType();
   unsigned numComponents = 1;
 
@@ -8102,18 +8105,30 @@ static Value *TranslateRawBufVecLd(Type *VecEltTy, unsigned ElemCount,
   return Vec;
 }
 
-Value *TranslateStructBufMatLd(Type *matType, IRBuilder<> &Builder,
-                               Value *handle, hlsl::OP *OP, Value *status,
-                               Value *bufIdx, Value *baseOffset,
+Value *TranslateStructBufMatLd(CallInst *CI, IRBuilder<> &Builder,
+                               Value *handle, HLResource::Kind RK, hlsl::OP *OP,
+                               Value *status, Value *bufIdx, Value *baseOffset,
                                const DataLayout &DL) {
+
+  Value *ptr = CI->getArgOperand(HLOperandIndex::kMatLoadPtrOpIdx);
+  Type *matType = ptr->getType()->getPointerElementType();
   HLMatrixType MatTy = HLMatrixType::cast(matType);
-  Type *EltTy = MatTy.getElementTypeForMem();
-  unsigned matSize = MatTy.getNumElements();
-  std::vector<Value *> bufLds;
-  Value *Vec =
+  Value *Vec = nullptr;
+  if (DXIL::IsStructuredBuffer(RK)) {
+    Type *EltTy = MatTy.getElementTypeForMem();
+    unsigned matSize = MatTy.getNumElements();
+    std::vector<Value *> bufLds;
+    Vec =
       TranslateRawBufVecLd(EltTy, matSize, Builder, handle, OP, status, bufIdx,
                            baseOffset, DL, bufLds, /*baseAlign (in bytes)*/ 8);
-  Vec = MatTy.emitLoweredMemToReg(Vec, Builder);
+    Vec = MatTy.emitLoweredMemToReg(Vec, Builder);
+    CI->replaceAllUsesWith(Vec);
+  } else {
+    ResLoadHelper helper(CI, RK, handle, bufIdx);
+    helper.Ty = MatTy.getLoweredVectorType(false /*MemRepr*/);
+    helper.offset = baseOffset;
+    Vec = TranslateBufLoad(helper, RK, Builder, OP, DL);
+  }
   return Vec;
 }
 
@@ -8156,9 +8171,9 @@ void TranslateStructBufMatSt(Type *matType, IRBuilder<> &Builder, Value *handle,
   }
 }
 
-void TranslateStructBufMatLdSt(CallInst *CI, Value *handle, hlsl::OP *OP,
-                               Value *status, Value *bufIdx, Value *baseOffset,
-                               const DataLayout &DL) {
+void TranslateStructBufMatLdSt(CallInst *CI, Value *handle, HLResource::Kind RK,
+                               hlsl::OP *OP, Value *status, Value *bufIdx,
+                               Value *baseOffset, const DataLayout &DL) {
   IRBuilder<> Builder(CI);
   HLOpcodeGroup group = hlsl::GetHLOpcodeGroupByName(CI->getCalledFunction());
   unsigned opcode = GetHLOpcode(CI);
@@ -8171,13 +8186,10 @@ void TranslateStructBufMatLdSt(CallInst *CI, Value *handle, hlsl::OP *OP,
   // orientation.
   switch (matOp) {
   case HLMatLoadStoreOpcode::RowMatLoad:
-  case HLMatLoadStoreOpcode::ColMatLoad: {
-    Value *ptr = CI->getArgOperand(HLOperandIndex::kMatLoadPtrOpIdx);
-    Value *NewLd = TranslateStructBufMatLd(
-        ptr->getType()->getPointerElementType(), Builder, handle, OP, status,
-        bufIdx, baseOffset, DL);
-    CI->replaceAllUsesWith(NewLd);
-  } break;
+  case HLMatLoadStoreOpcode::ColMatLoad:
+    TranslateStructBufMatLd(CI, Builder, handle, RK, OP, status, bufIdx,
+                            baseOffset, DL);
+    break;
   case HLMatLoadStoreOpcode::RowMatStore:
   case HLMatLoadStoreOpcode::ColMatStore: {
     Value *ptr = CI->getArgOperand(HLOperandIndex::kMatStoreDstPtrOpIdx);
@@ -8440,7 +8452,7 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
       userCall->eraseFromParent();
     } else if (group == HLOpcodeGroup::HLMatLoadStore)
       // Load/Store matrix within a struct
-      TranslateStructBufMatLdSt(userCall, handle, OP, status, bufIdx,
+      TranslateStructBufMatLdSt(userCall, handle, ResKind, OP, status, bufIdx,
                                 baseOffset, DL);
     else if (group == HLOpcodeGroup::HLSubscript) {
       // Subscript of matrix within a struct
@@ -8467,8 +8479,8 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
 
       ldInst->replaceAllUsesWith(newLd);
     } else {
-      // ByteAddress buffers can't have defined offsets, use the index.
-      ResLoadHelper helper(ldInst, ResKind, handle, baseOffset);
+      ResLoadHelper helper(ldInst, ResKind, handle, bufIdx);
+      helper.offset = baseOffset;
       TranslateBufLoad(helper, ResKind, Builder, OP, DL);
     }
     ldInst->eraseFromParent();
@@ -8533,13 +8545,18 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
     DXASSERT_LOCALVAR(Ty,
                       offset->getType() == Type::getInt32Ty(Ty->getContext()),
                       "else bitness is wrong");
-    offset = Builder.CreateAdd(offset, baseOffset);
+    // Raw buffers can't have defined offsets, apply to index.
+    if (DXIL::IsRawBuffer(ResKind))
+      bufIdx = Builder.CreateAdd(offset, bufIdx);
+    else
+      baseOffset = Builder.CreateAdd(offset, baseOffset);
 
     for (auto U = GEP->user_begin(); U != GEP->user_end();) {
       Value *GEPUser = *(U++);
 
       TranslateStructBufSubscriptUser(cast<Instruction>(GEPUser), handle,
-                                      ResKind, bufIdx, offset, status, OP, DL);
+                                      ResKind, bufIdx, baseOffset, status, OP,
+                                      DL);
     }
     // delete the inst
     GEP->eraseFromParent();
@@ -8553,13 +8570,12 @@ void TranslateStructBufSubscript(CallInst *CI, Value *handle, Value *status,
       CI->getArgOperand(HLOperandIndex::kSubscriptIndexOpIdx);
   Value *bufIdx = nullptr;
   Value *offset = nullptr;
-  if (ResKind == HLResource::Kind::RawBuffer) {
-    offset = subscriptIndex;
-  } else {
+  bufIdx = subscriptIndex;
+  if (ResKind == HLResource::Kind::RawBuffer)
+    offset = UndefValue::get(Type::getInt32Ty(CI->getContext()));
+  else
     // StructuredBuffer, TypedBuffer, etc.
-    bufIdx = subscriptIndex;
     offset = OP->GetU32Const(0);
-  }
 
   for (auto U = CI->user_begin(); U != CI->user_end();) {
     Value *user = *(U++);
@@ -8585,6 +8601,7 @@ Value *TranslateTypedBufLoad(CallInst *CI, DXIL::ResourceKind RK,
     ldHelper.mipLevel = hlslOP->GetU32Const(0);
   // use ldInst as retVal
   ldHelper.retVal = ldInst;
+  ldHelper.Ty = ldInst->getType();
   TranslateLoad(ldHelper, RK, Builder, hlslOP, DL);
   // delete the ld
   ldInst->eraseFromParent();
