@@ -2602,6 +2602,24 @@ const OP::OpCodeProperty OP::m_OpCodeProps[(unsigned)OP::OpCode::NumOpCodes] = {
          false},
         Attribute::ReadNone,
     },
+
+    //                                                                                                                         void,     h,     f,     d,    i1,    i8,   i16,   i32,   i64,   udt,   obj ,  function attribute
+    {
+        OC::RawBufferVectorLoad,
+        "RawBufferVectorLoad",
+        OCC::RawBufferVectorLoad,
+        "rawBufferVectorLoad",
+        {false, true, true, true, false, false, true, true, true, false, false},
+        Attribute::ReadOnly,
+    },
+    {
+        OC::RawBufferVectorStore,
+        "RawBufferVectorStore",
+        OCC::RawBufferVectorStore,
+        "rawBufferVectorStore",
+        {false, true, true, true, false, false, true, true, true, false, false},
+        Attribute::None,
+    },
 };
 // OPCODE-OLOADS:END
 
@@ -5421,6 +5439,25 @@ Function *OP::GetOpFunc(OpCode opCode, Type *pOverloadType) {
     A(pI32);
     A(pI32);
     break;
+
+    //
+  case OpCode::RawBufferVectorLoad:
+    RRT(pETy);
+    A(pI32);
+    A(pRes);
+    A(pI32);
+    A(pI32);
+    A(pI32);
+    break;
+  case OpCode::RawBufferVectorStore:
+    A(pV);
+    A(pI32);
+    A(pRes);
+    A(pI32);
+    A(pI32);
+    A(pETy);
+    A(pI32);
+    break;
   // OPCODE-OLOAD-FUNCS:END
   default:
     DXASSERT(false, "otherwise unhandled case");
@@ -5569,6 +5606,7 @@ llvm::Type *OP::GetOverloadType(OpCode opCode, llvm::Function *F) {
   case OpCode::StoreVertexOutput:
   case OpCode::StorePrimitiveOutput:
   case OpCode::DispatchMesh:
+  case OpCode::RawBufferVectorStore:
     if (FT->getNumParams() <= 4)
       return nullptr;
     return FT->getParamType(4);
@@ -5770,7 +5808,8 @@ llvm::Type *OP::GetOverloadType(OpCode opCode, llvm::Function *F) {
   case OpCode::TextureGatherRaw:
   case OpCode::SampleCmpLevel:
   case OpCode::SampleCmpGrad:
-  case OpCode::SampleCmpBias: {
+  case OpCode::SampleCmpBias:
+  case OpCode::RawBufferVectorLoad: {
     StructType *ST = cast<StructType>(Ty);
     return ST->getElementType(0);
   }

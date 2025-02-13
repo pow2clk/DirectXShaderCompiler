@@ -475,6 +475,9 @@ inline bool IsFeedbackTexture(DXIL::ResourceKind ResourceKind) {
 // Enumeration for operations specified by DXIL
 enum class OpCode : unsigned {
   //
+  RawBufferVectorLoad = 258, // reads from a raw buffer and structured buffer
+  RawBufferVectorStore =
+      259,          // writes to a RWByteAddressBuffer or RWStructuredBuffer
   Reserved0 = 226,  // Reserved
   Reserved1 = 227,  // Reserved
   Reserved10 = 236, // Reserved
@@ -984,8 +987,9 @@ enum class OpCode : unsigned {
   NumOpCodes_Dxil_1_6 = 222,
   NumOpCodes_Dxil_1_7 = 226,
   NumOpCodes_Dxil_1_8 = 258,
+  NumOpCodes_Dxil_1_9 = 260,
 
-  NumOpCodes = 258 // exclusive last value of enumeration
+  NumOpCodes = 260 // exclusive last value of enumeration
 };
 // OPCODE-ENUM:END
 
@@ -997,6 +1001,8 @@ enum class OpCode : unsigned {
 // Groups for DXIL operations with equivalent function templates
 enum class OpCodeClass : unsigned {
   //
+  RawBufferVectorLoad,
+  RawBufferVectorStore,
   Reserved,
 
   // Amplification shader instructions
@@ -1291,8 +1297,9 @@ enum class OpCodeClass : unsigned {
   NumOpClasses_Dxil_1_6 = 149,
   NumOpClasses_Dxil_1_7 = 153,
   NumOpClasses_Dxil_1_8 = 174,
+  NumOpClasses_Dxil_1_9 = 176,
 
-  NumOpClasses = 174 // exclusive last value of enumeration
+  NumOpClasses = 176 // exclusive last value of enumeration
 };
 // OPCODECLASS-ENUM:END
 
