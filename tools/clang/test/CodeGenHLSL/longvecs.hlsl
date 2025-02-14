@@ -24,9 +24,7 @@ float4 altogetherNow(vector<float, 8> vec1, vector<float, 8> vec2, vector<float,
     vec3.xyzw + float4(vec3[4], vec3[5], vec3[6], vec3[7]);
 }
 
-vector<TYPE, 8> gs_vec1;
-vector<TYPE, 8> gs_vec2;
-vector<TYPE, 8> gs_vec3;
+groupshared vector<TYPE, 8> gs_vec1, gs_vec2,gs_vec3;
 
 // Just a trick to capture the needed type spellings since the DXC version of FileCheck can't do that explicitly.
 // F32-DAG: %dx.types.ResRet.[[TY:f32]] = type { [[TYPE:float]]
@@ -137,8 +135,8 @@ float4 main() : SV_Target {
   // Test mixed type operations
   vec2 = dostuff(vec2, unvec, vec3);
 
-  // TEST "Groupshared". Really fucks things up now!
-  //gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
+  // TEST Groupshared. Really fucks things up now!
+  // gs_vec2 = dostuff(gs_vec1, gs_vec2, gs_vec3);
 
   // mix groupshared and non
   //vec1 = dostuff(vec1, gs_vec2, vec3);
