@@ -1,4 +1,9 @@
-// RUN: %dxc -DTYPE=float -DNUM=4 -T lib_6_9 %s | FileCheck %s
+// RUN: %dxc -DTYPE=float -DNUM=7 -T lib_6_9 %s | FileCheck %s
+// RUN: %dxc -DTYPE=bool -DNUM=7 -T lib_6_9 %s | FileCheck %s
+// RUN: %dxc -DTYPE=uint64_t -DNUM=7 -T lib_6_9 %s | FileCheck %s
+// RUN: %dxc -DTYPE=double -DNUM=7 -T lib_6_9 %s | FileCheck %s
+// RUN: %dxc -DTYPE=float16_t -DNUM=7 -T lib_6_9 -enable-16bit-types %s | FileCheck %s
+// RUN: %dxc -DTYPE=int16_t -DNUM=7 -T lib_6_9 -enable-16bit-types %s | FileCheck %s
 
 struct LongVec {
   float4 f;
@@ -16,6 +21,16 @@ groupshared LongVec gs_vec_rec;
 export vector<TYPE, NUM> lv_param_passthru(vector<TYPE, NUM> vec1) {
   vector<TYPE, NUM> ret = vec1;
   return ret;
+}
+
+export void lv_param_in_out(in vector<TYPE, NUM> vec1, out vector<TYPE, NUM> vec2) {
+  vec2 = vec1;
+}
+
+export void lv_param_inout(inout vector<TYPE, NUM> vec1, inout vector<TYPE, NUM> vec2) {
+  vector<TYPE, NUM> tmp = vec1;
+  vec1 = vec2;
+  vec2 = tmp;
 }
 
 export void lv_global_assign(vector<TYPE, NUM> vec) {
