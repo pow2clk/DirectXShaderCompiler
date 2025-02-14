@@ -1,6 +1,4 @@
-// RUN: %dxc -E vret_main  -DTYPE=float -DNUM=7 -T vs_6_9 -verify %s
-// RUN: %dxc -E vparm_main -DTYPE=float -DNUM=7 -T vs_6_9 -verify %s
-// RUN: %dxc -E sparm_main -DTYPE=float -DNUM=7 -T vs_6_9 -verify %s
+// RUN: %dxc  -DTYPE=float -DNUM=7 -T ps_6_9 -verify %s
 
 struct LongVec {
   float4 f;
@@ -8,35 +6,37 @@ struct LongVec {
 };
 
 struct LongVecParm {
-  float3 f : SV_Position;
+  float f;
+  float4 tar2 : SV_Target2;
   vector<TYPE,NUM> vec;
 };
 
-vector<TYPE, NUM> global_vec;// expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+vector<TYPE, NUM> global_vec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 
-vector<TYPE, NUM> global_vec_arr[10];
+vector<TYPE, NUM> global_vec_arr[10]; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 
-LongVec global_vec_rec;
+LongVec global_vec_rec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 
 cbuffer BadBuffy {
-  vector<TYPE, NUM> cb_vec;// expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
-  vector<TYPE, NUM> cb_vec_arr[10];
-  LongVec cb_vec_rec;
+  vector<TYPE, NUM> cb_vec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  vector<TYPE, NUM> cb_vec_arr[10]; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  LongVec cb_vec_rec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 };
 
-ConstantBuffer< LongVec > const_buf;
-TextureBuffer< LongVec > tex_buf;
+tbuffer BadTuffy {
+  vector<TYPE, NUM> cb_vec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  vector<TYPE, NUM> cb_vec_arr[10]; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  LongVec cb_vec_rec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+};
 
-vector<TYPE, NUM> vret_main() : SV_Position {
-  vector<TYPE, NUM> ret = 4.0;
-  return ret;
-}
+ConstantBuffer< LongVec > const_buf; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+TextureBuffer< LongVec > tex_buf; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 
-float3 vparm_main(vector<TYPE, NUM> vec : V) : SV_Position {
-  return vec[0];
-}
-
-float3 sparm_main(LongVecParm vec) : SV_Position {
-   return vec.f;
+vector<TYPE, 5> main( // expected-error{{Vectors of over 4 elements in entry function return type are not supported}}
+                     vector<TYPE, NUM> vec : V, // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+                     LongVecParm parm, Buffer buf : B) : SV_Target { // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+  parm.f = vec; // expected-warning {{implicit truncation of vector type}}
+  parm.tar2 = vec; // expected-warning {{implicit truncation of vector type}}
+  return vec; // expected-warning {{implicit truncation of vector type}}
 }
 

@@ -2801,6 +2801,33 @@ static TypedefDecl *CreateGlobalTypedef(ASTContext *context, const char *ident,
   return decl;
 }
 
+bool HasLongVecs(const QualType &qt) {
+  if (qt.isNull()) {
+    return false;
+  }
+
+  if (IsHLSLVecType(qt)) {
+    if(GetHLSLVecSize(qt) > 4)
+      return true;
+  } else if (qt->isArrayType()) {
+    const ArrayType *arrayType = qt->getAsArrayTypeUnsafe();
+    return HasLongVecs(arrayType->getElementType());
+  } else if (qt->isStructureOrClassType()) {
+    const RecordType *recordType = qt->getAs<RecordType>();
+    const RecordDecl *recordDecl = recordType->getDecl();
+    if (recordDecl->isInvalidDecl())
+      return false;
+    RecordDecl::field_iterator begin = recordDecl->field_begin();
+    RecordDecl::field_iterator end = recordDecl->field_end();
+    for (;begin != end; begin++) {
+      const FieldDecl *fieldDecl = *begin;
+      if (HasLongVecs(fieldDecl->getType()))
+        return true;
+    }
+  }
+  return false;
+}
+
 class HLSLExternalSource : public ExternalSemaSource {
 private:
   // Inner types.
@@ -5089,6 +5116,11 @@ public:
               << argType;
           return true;
         }
+        if (HasLongVecs(argType)) {
+          m_sema->Diag(argSrcLoc, diag::err_hlsl_unsupported_long_vector) << "cbuffers";
+          return true;
+        }
+
         if (auto *TST = dyn_cast<TemplateSpecializationType>(argType)) {
           // This is a bit of a special case we need to handle. Because the
           // buffer types don't use their template parameter in a way that would
@@ -14515,9 +14547,8 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
   }
 
   // Vectors of over 4 elements can't fit in the cbuffer 16 byte registers.
-  if (hlsl::IsVectorType(this, qt) && hlsl::GetElementCount(qt) > 4 &&
-      isGlobal && !isStatic && !isGroupShared) {
-    Diag(D.getLocStart(), diag::err_hlsl_long_vector_in_cbuffer);
+  if (isGlobal && !isStatic && !isGroupShared && HasLongVecs(qt)) {
+    Diag(D.getLocStart(), diag::err_hlsl_unsupported_long_vector) << "cbuffers";
     result = false;
   }
 
@@ -16116,6 +16147,15 @@ void DiagnoseEntry(Sema &S, FunctionDecl *FD) {
 
     return;
   }
+
+  // Check general parameter characteristics
+  // Would be nice to check for resources here as they crash the compiler now.
+  for (const auto *param : FD->params())
+    if(HasLongVecs(param->getType()))
+      S.Diag(param->getLocation(), diag::err_hlsl_unsupported_long_vector) << "entry function parameters";
+
+  if (HasLongVecs(FD->getReturnType()))
+      S.Diag(FD->getLocation(), diag::err_hlsl_unsupported_long_vector) << "entry function return type";
 
   DXIL::ShaderKind Stage =
       ShaderModel::KindFromFullName(shaderAttr->getStage());
