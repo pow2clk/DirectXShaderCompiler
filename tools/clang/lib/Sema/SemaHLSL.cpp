@@ -11426,10 +11426,16 @@ bool hlsl::DiagnoseNodeStructArgument(Sema *self, TemplateArgumentLoc ArgLoc,
   HLSLExternalSource *source = HLSLExternalSource::FromSema(self);
   ArTypeObjectKind shapeKind = source->GetTypeObjectKind(ArgTy);
   switch (shapeKind) {
+  case AR_TOBJ_VECTOR:
+    if (GetHLSLVecSize(ArgTy) > 4) {
+      self->Diag(ArgLoc.getLocation(), diag::err_hlsl_unsupported_long_vector) << "node records";
+      Empty = false;
+      return false;
+    }
+    LLVM_FALLTHROUGH;
   case AR_TOBJ_ARRAY:
   case AR_TOBJ_BASIC:
   case AR_TOBJ_MATRIX:
-  case AR_TOBJ_VECTOR:
     Empty = false;
     return false;
   case AR_TOBJ_OBJECT:

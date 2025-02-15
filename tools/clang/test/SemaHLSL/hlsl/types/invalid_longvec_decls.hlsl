@@ -90,3 +90,34 @@ groupshared LongVec as_pld;
 void Amp() {
   DispatchMesh(1,1,1,as_pld); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
 }
+
+struct LongVecRec {
+  uint3 grid : SV_DispatchGrid;
+  vector<TYPE,NUM> vec;
+};
+struct loadStressRecord
+{
+    uint3 grid : SV_DispatchGrid;
+    uint  data[29];
+  vector<TYPE,NUM> vec;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NumThreads(8,1,1)]
+[NodeMaxDispatchGrid(8,1,1)]
+void broadcast(DispatchNodeInputRecord<LongVecRec> input,  // expected-error{{Vectors of over 4 elements in node records are not supported}}
+                NodeOutput<LongVec> output) // expected-error{{Vectors of over 4 elements in node records are not supported}}
+{
+  ThreadNodeOutputRecords<LongVec> touts; // expected-error{{Vectors of over 4 elements in node records are not supported}}
+  GroupNodeOutputRecords<LongVec> gouts; // expected-error{{Vectors of over 4 elements in node records are not supported}}
+}
+
+[Shader("node")]
+[NodeLaunch("coalescing")]
+[NumThreads(8,1,1)]
+void coalesce(GroupNodeInputRecords<LongVec> input) {} // expected-error{{Vectors of over 4 elements in node records are not supported}}
+
+[Shader("node")]
+[NodeLaunch("thread")]
+void threader(ThreadNodeInputRecord<LongVec> input) {} // expected-error{{Vectors of over 4 elements in node records are not supported}}
