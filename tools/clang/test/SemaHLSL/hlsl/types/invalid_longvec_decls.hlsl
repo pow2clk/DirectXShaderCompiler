@@ -1,8 +1,8 @@
 // RUN: %dxc  -DTYPE=float -DNUM=7 -T ps_6_9 -verify %s
 
-struct LongVec {
-  float4 f;
-  vector<TYPE,NUM> vec;
+struct [raypayload] LongVec {
+  float4 f : write(closesthit) : read(caller); 
+  vector<TYPE,NUM> vec : write(closesthit) : read(caller); 
 };
 
 struct LongVecParm {
@@ -24,9 +24,9 @@ cbuffer BadBuffy {
 };
 
 tbuffer BadTuffy {
-  vector<TYPE, NUM> cb_vec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
-  vector<TYPE, NUM> cb_vec_arr[10]; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
-  LongVec cb_vec_rec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  vector<TYPE, NUM> tb_vec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  vector<TYPE, NUM> tb_vec_arr[10]; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
+  LongVec tb_vec_rec; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
 };
 
 ConstantBuffer< LongVec > const_buf; // expected-error{{Vectors of over 4 elements in cbuffers are not supported}}
@@ -40,3 +40,53 @@ vector<TYPE, 5> main( // expected-error{{Vectors of over 4 elements in entry fun
   return vec; // expected-warning {{implicit truncation of vector type}}
 }
 
+RaytracingAccelerationStructure RTAS;
+
+[shader("raygeneration")]
+void raygen() {
+  LongVec p = (LongVec)0;
+  RayDesc ray = (RayDesc)0;
+  TraceRay(RTAS, RAY_FLAG_NONE, 0, 0, 1, 0, ray, p); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+  CallShader(0, p); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}
+
+[shader("closesthit")]
+void closesthit(inout LongVec payload, // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+		in LongVec attribs ) { // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+  RayDesc ray;
+  TraceRay( RTAS, RAY_FLAG_NONE, 0xff, 0, 1, 0, ray, payload ); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+  CallShader(0, payload); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}
+
+[shader("anyhit")]
+void AnyHit( inout LongVec payload, // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+	      in LongVec attribs  ) // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+{
+}
+
+[shader("miss")]
+void Miss(inout LongVec payload){ // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+  RayDesc ray;
+  TraceRay( RTAS, RAY_FLAG_NONE, 0xff, 0, 1, 0, ray, payload ); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+  CallShader(0, payload); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}
+
+[shader("intersection")]
+void Intersection() {
+  float hitT = RayTCurrent();
+  LongVec attr = (LongVec)0;
+  bool bReported = ReportHit(hitT, 0, attr); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}
+
+[shader("callable")]
+void callable1(inout LongVec p) { // expected-error{{Vectors of over 4 elements in entry function parameters are not supported}}
+  CallShader(0, p); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}
+
+groupshared LongVec as_pld;
+
+[shader("amplification")]
+[numthreads(1,1,1)]
+void Amp() {
+  DispatchMesh(1,1,1,as_pld); // expected-error{{Vectors of over 4 elements in user-defined struct parameter are not supported}}
+}

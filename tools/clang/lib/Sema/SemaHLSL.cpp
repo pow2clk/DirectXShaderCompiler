@@ -2801,33 +2801,6 @@ static TypedefDecl *CreateGlobalTypedef(ASTContext *context, const char *ident,
   return decl;
 }
 
-bool HasLongVecs(const QualType &qt) {
-  if (qt.isNull()) {
-    return false;
-  }
-
-  if (IsHLSLVecType(qt)) {
-    if(GetHLSLVecSize(qt) > 4)
-      return true;
-  } else if (qt->isArrayType()) {
-    const ArrayType *arrayType = qt->getAsArrayTypeUnsafe();
-    return HasLongVecs(arrayType->getElementType());
-  } else if (qt->isStructureOrClassType()) {
-    const RecordType *recordType = qt->getAs<RecordType>();
-    const RecordDecl *recordDecl = recordType->getDecl();
-    if (recordDecl->isInvalidDecl())
-      return false;
-    RecordDecl::field_iterator begin = recordDecl->field_begin();
-    RecordDecl::field_iterator end = recordDecl->field_end();
-    for (;begin != end; begin++) {
-      const FieldDecl *fieldDecl = *begin;
-      if (HasLongVecs(fieldDecl->getType()))
-        return true;
-    }
-  }
-  return false;
-}
-
 class HLSLExternalSource : public ExternalSemaSource {
 private:
   // Inner types.
@@ -11918,6 +11891,33 @@ bool hlsl::ShouldSkipNRVO(clang::Sema &sema, clang::QualType returnType,
   return false;
 }
 
+bool hlsl::HasLongVecs(const QualType &qt) {
+  if (qt.isNull()) {
+    return false;
+  }
+
+  if (IsHLSLVecType(qt)) {
+    if(GetHLSLVecSize(qt) > 4)
+      return true;
+  } else if (qt->isArrayType()) {
+    const ArrayType *arrayType = qt->getAsArrayTypeUnsafe();
+    return HasLongVecs(arrayType->getElementType());
+  } else if (qt->isStructureOrClassType()) {
+    const RecordType *recordType = qt->getAs<RecordType>();
+    const RecordDecl *recordDecl = recordType->getDecl();
+    if (recordDecl->isInvalidDecl())
+      return false;
+    RecordDecl::field_iterator begin = recordDecl->field_begin();
+    RecordDecl::field_iterator end = recordDecl->field_end();
+    for (;begin != end; begin++) {
+      const FieldDecl *fieldDecl = *begin;
+      if (HasLongVecs(fieldDecl->getType()))
+        return true;
+    }
+  }
+  return false;
+}
+
 bool hlsl::IsConversionToLessOrEqualElements(
     clang::Sema *self, const clang::ExprResult &sourceExpr,
     const clang::QualType &targetType, bool explicitConversion) {
@@ -15440,6 +15440,16 @@ static bool isRelatedDeclMarkedNointerpolation(Expr *E) {
   return false;
 }
 
+// Verify that user-defined intrinsic struct args contain no long vectors
+static bool CheckUDTIntrinsicArg(Sema *S, Expr *Arg) {
+  if(HasLongVecs(Arg->getType())) {
+    S->Diag(Arg->getExprLoc(), diag::err_hlsl_unsupported_long_vector)
+      << "user-defined struct parameter";
+    return true;
+  }
+  return false;
+}
+
 static bool CheckIntrinsicGetAttributeAtVertex(Sema *S, FunctionDecl *FDecl,
                                                CallExpr *TheCall) {
   assert(TheCall->getNumArgs() > 0);
@@ -15468,6 +15478,22 @@ bool Sema::CheckHLSLIntrinsicCall(FunctionDecl *FDecl, CallExpr *TheCall) {
     // existing ones. See the ExtensionTest.EvalAttributeCollision test.
     assert(FDecl->getName() == "GetAttributeAtVertex");
     return CheckIntrinsicGetAttributeAtVertex(this, FDecl, TheCall);
+  case hlsl::IntrinsicOp::IOP_DispatchMesh:
+    assert(TheCall->getNumArgs() > 3);
+    assert(FDecl->getName() == "DispatchMesh");
+    return CheckUDTIntrinsicArg(this, TheCall->getArg(3)->IgnoreCasts());
+  case hlsl::IntrinsicOp::IOP_CallShader:
+    assert(TheCall->getNumArgs() > 1);
+    assert(FDecl->getName() == "CallShader");
+    return CheckUDTIntrinsicArg(this, TheCall->getArg(1)->IgnoreCasts());
+  case hlsl::IntrinsicOp::IOP_TraceRay:
+    assert(TheCall->getNumArgs() > 7);
+    assert(FDecl->getName() == "TraceRay");
+    return CheckUDTIntrinsicArg(this, TheCall->getArg(7)->IgnoreCasts());
+  case hlsl::IntrinsicOp::IOP_ReportHit:
+    assert(TheCall->getNumArgs() > 2);
+    assert(FDecl->getName() == "ReportHit");
+    return CheckUDTIntrinsicArg(this, TheCall->getArg(2)->IgnoreCasts());
   default:
     break;
   }
