@@ -481,6 +481,26 @@ Value *TrivialDxilOperation(OP::OpCode opcode, ArrayRef<Value *> refArgs,
   return TrivialDxilOperation(opcode, refArgs, Ty, Inst->getType(), hlslOP, B);
 }
 
+Value *TrivialDxilVectorOperation(OP::OpCode opcode, Value *src,
+				  OP *hlslOP, IRBuilder<> &Builder) {
+
+  Type *Ty = src->getType();
+
+  Constant *opArg = hlslOP->GetU32Const((unsigned)opcode);
+  Value *args[] = {opArg, src};
+
+  Function *dxilFunc = hlslOP->GetOpFunc(opcode, Ty);
+
+  if (!Ty->isVoidTy()) {
+    Value *retVal =
+      Builder.CreateCall(dxilFunc, args, hlslOP->GetOpCodeName(opcode));
+    return retVal;
+  } else {
+    // Cannot add name to void.
+    return Builder.CreateCall(dxilFunc, args);
+  }
+}
+
 Value *TrivialDxilUnaryOperationRet(OP::OpCode opcode, Value *src, Type *RetTy,
                                     hlsl::OP *hlslOP, IRBuilder<> &Builder) {
   Type *Ty = src->getType();
@@ -2211,8 +2231,11 @@ Value *TranslateExp(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
         ConstantVector::getSplat(Ty->getVectorNumElements(), log2eConst);
   }
   val = Builder.CreateFMul(log2eConst, val);
-  Value *exp = TrivialDxilUnaryOperation(OP::OpCode::Exp, val, hlslOP, Builder);
-  return exp;
+  if (val->getType()->isVectorTy() &&
+      hlslOP->GetModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
+    return TrivialDxilVectorOperation(OP::OpCode::Exp, val, hlslOP, Builder);
+  else
+    return TrivialDxilUnaryOperation(OP::OpCode::Exp, val, hlslOP, Builder);
 }
 
 Value *TranslateLog(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
@@ -3970,6 +3993,9 @@ struct ResLoadHelper {
       : intrinsicOpCode(IntrinsicOp::Num_Intrinsics), handle(h), retVal(ldInst),
         addr(idx), offset(nullptr), status(nullptr), mipLevel(mip) {
     opcode = LoadOpFromResKind(RK);
+    if (opcode == OP::OpCode::RawBufferLoad && Ty->isVectorTy() &&
+        ldInst->getModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
+      opcode = OP::OpCode::RawBufferVectorLoad;
     Type *i32Ty = IRBuilder<>(ldInst).getInt32Ty();
     if (DXIL::IsStructuredBuffer(RK))
       offset = ConstantInt::get(i32Ty, 0U);
@@ -4060,6 +4086,9 @@ ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
         status = CI->getArgOperand(kStatusIdx);
     }
   } else {
+    if (opcode == OP::OpCode::RawBufferLoad && Ty->isVectorTy() &&
+        CI->getModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
+      opcode = OP::OpCode::RawBufferVectorLoad;
     const unsigned kStatusIdx = HLOperandIndex::kBufLoadStatusOpIdx;
     if (argc > kStatusIdx)
       status = CI->getArgOperand(kStatusIdx);
@@ -4159,16 +4188,23 @@ GetBufLoadArgs(ResLoadHelper helper, HLResource::Kind RK, IRBuilder<> Builder,
         Args.emplace_back(undefI);
     }
   } else {
+    // Handle BufferLoad, RawBufferLoad, and RawBufferVectorLoad.
+
     // coord (may be changed later) @2
     Args.emplace_back(
         isVectorAddr ? Builder.CreateExtractElement(helper.addr, (uint64_t)0)
                      : helper.addr);
     Args.emplace_back(helper.offset); // offset (may be changed later) @3
+
     if (opcode == OP::OpCode::RawBufferLoad) {
       // Unlike typed buffer load, raw buffer load has mask and alignment.
       Args.emplace_back(nullptr);      // mask (to be added later) @4
       Args.emplace_back(alignmentVal); // alignment @5
+    } else if (opcode == OP::OpCode::RawBufferVectorLoad) {
+      // RawBufferVectorLoad takes no mask argument.
+      Args.emplace_back(alignmentVal); // alignment @4
     }
+
   }
   return Args;
 }
@@ -4207,40 +4243,49 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   // Keep track of the first load for debug info migration.
   Value *FirstLd = nullptr;
-  // Create calls to function object.
-  // Typed buffer loads are limited to one load of up to 4 32-bit values.
-  // Raw buffer loads might need multiple loads in chunks of 4.
-  for (unsigned i = 0; i < numComponents;) {
-    unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
+  Value *retValNew = nullptr;
+  if (OpCode == OP::OpCode::RawBufferVectorLoad) {
+    FirstLd = GenerateBufLd(OP, Builder, OpCode, Ty,
+                              1, Args, elts.begin());
+    UpdateStatus(FirstLd, helper.status, Builder, OP);
+    retValNew = elts[0];
+    if (!Ty->isVectorTy())
+      retValNew = Builder.CreateExtractElement(retValNew, (uint64_t)0);
+  } else {
+    // Create calls to function object.
+    // Typed buffer loads are limited to one load of up to 4 32-bit values.
+    // Raw buffer loads might need multiple loads in chunks of 4.
+    for (unsigned i = 0; i < numComponents;) {
+      unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
 
-    // Assign mask for raw buffer loads.
-    if (OpCode == OP::OpCode::RawBufferLoad)
-      Args[kMaskIdx] = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
+      // Assign mask for raw buffer loads.
+      if (OpCode == OP::OpCode::RawBufferLoad)
+        Args[kMaskIdx] = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
 
-    Value *Ld = GenerateBufLd(OP, Builder, OpCode, Ty->getScalarType(),
-                              chunkSize, Args, elts.begin() + i);
-    i += chunkSize;
+      Value *Ld = GenerateBufLd(OP, Builder, OpCode, Ty->getScalarType(),
+                                chunkSize, Args, elts.begin() + i);
+      i += chunkSize;
 
-    // Update status.
-    UpdateStatus(Ld, helper.status, Builder, OP);
+      // Update status.
+      UpdateStatus(Ld, helper.status, Builder, OP);
 
-    if (!FirstLd)
-      FirstLd = Ld;
+      if (!FirstLd)
+        FirstLd = Ld;
 
-    if (OpCode == OP::OpCode::RawBufferLoad && i < numComponents) {
-      if (RK == DxilResource::Kind::RawBuffer)
-        // Raw buffers can't use offset param. Add to coord index.
-        Args[kCoordIdx] = Builder.CreateAdd(
-            Args[kCoordIdx],
-            OP->GetU32Const(4 * EltSize));
-      else
-        // Structured buffers increment the offset parameter.
-        Args[kOffsetIdx] =
+      if (OpCode == OP::OpCode::RawBufferLoad && i < numComponents) {
+        if (RK == DxilResource::Kind::RawBuffer)
+          // Raw buffers can't use offset param. Add to coord index.
+          Args[kCoordIdx] = Builder.CreateAdd(
+                                              Args[kCoordIdx],
+                                              OP->GetU32Const(4 * EltSize));
+        else
+          // Structured buffers increment the offset parameter.
+          Args[kOffsetIdx] =
             Builder.CreateAdd(Args[kOffsetIdx], OP->GetU32Const(4 * EltSize));
+      }
     }
+    retValNew = ScalarizeElements(Ty, elts, Builder);
   }
-
-  Value *retValNew = ScalarizeElements(Ty, elts, Builder);
 
   DXASSERT(FirstLd, "No loads created by TranslateBufLoad");
 
@@ -7813,13 +7858,13 @@ namespace {
 // Returns load call return value
 //  and the elements extracted from it in `Elts`
 static Value *GenerateBufLd(hlsl::OP *OP, IRBuilder<> &Builder,
-                            OP::OpCode opcode, Type *EltTy,
+                            OP::OpCode opcode, Type *Ty,
                             unsigned NumElements, ArrayRef<Value *> Args,
                             std::vector<Value *>::iterator EltIt) {
   Type *i64Ty = Builder.getInt64Ty();
   Type *doubleTy = Builder.getDoubleTy();
-  const bool is64 = (EltTy == i64Ty || EltTy == doubleTy);
-  const bool isBool = EltTy->isIntegerTy(1);
+  const bool is64 = (Ty == i64Ty || Ty == doubleTy);
+  const bool isBool = Ty->isIntegerTy(1);
   const bool isTyped =
       (opcode == OP::OpCode::BufferLoad || opcode == OP::OpCode::TextureLoad);
   Function *F = nullptr;
@@ -7827,19 +7872,22 @@ static Value *GenerateBufLd(hlsl::OP *OP, IRBuilder<> &Builder,
     // Value will be loaded in its memory representation.
     F = OP->GetOpFunc(opcode, Builder.getInt32Ty());
   else
-    F = OP->GetOpFunc(opcode, EltTy);
+    F = OP->GetOpFunc(opcode, Ty);
   Value *Ld = Builder.CreateCall(F, Args, OP::GetOpCodeName(opcode));
 
   // Extract values and convet to register type if needed.
   // 64-bit types need to have the two i32 merged into their result
   // bools need to use cmp to convert them to i1s.
 
-  if (!is64 || !isTyped) {
+  if (opcode == OP::OpCode::RawBufferVectorLoad) {
+    DXASSERT(!is64, "64-bit type conversions for longvecs requires op/intrinsic support");
+    *EltIt = Builder.CreateExtractValue(Ld, 0);
+  } else if (!is64 || !isTyped) {
     for (unsigned i = 0; i < NumElements; i++, EltIt++)
       *EltIt = Builder.CreateExtractValue(Ld, i);
   } else {
     DXASSERT(NumElements <= 2, "typed buffer only allow 4 dwords");
-    if (EltTy == doubleTy) {
+    if (Ty == doubleTy) {
       Function *makeDouble = OP->GetOpFunc(DXIL::OpCode::MakeDouble, doubleTy);
       Value *makeDoubleOpArg =
           Builder.getInt32((unsigned)DXIL::OpCode::MakeDouble);
