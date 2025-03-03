@@ -912,6 +912,7 @@ static QualType GetOrCreateMatrixSpecialization(
 
 /// <summary>Instantiates a new vector type specialization or gets an existing
 /// one from the AST.</summary>
+// Possibly a place to set the definitiondata bit.
 static QualType
 GetOrCreateVectorSpecialization(ASTContext &context, Sema *sema,
                                 ClassTemplateDecl *vectorTemplateDecl,
@@ -941,6 +942,10 @@ GetOrCreateVectorSpecialization(ASTContext &context, Sema *sema,
   DXASSERT(!lookupResult.empty(),
            "otherwise vector handle cannot be looked up");
 #endif
+
+  CXXRecordDecl *Decl = vectorSpecializationType->getAsCXXRecordDecl();
+  if (GetHLSLVecSize(vectorSpecializationType) > DXIL::kDefaultMaxVectorLength)
+    Decl->setHasLongVector();
 
   return vectorSpecializationType;
 }
@@ -4119,6 +4124,7 @@ public:
       if (decl == m_matrixTemplateDecl)
         return AR_TOBJ_MATRIX;
       else if (decl == m_vectorTemplateDecl)
+        // This is not where we should set ClassTemplateSpecializationDecl's DefinitionData, but a model for how it could be done.
         return AR_TOBJ_VECTOR;
       else if (decl == m_vkIntegralConstantTemplateDecl ||
                decl == m_vkLiteralTemplateDecl)

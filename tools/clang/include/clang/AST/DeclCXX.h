@@ -465,6 +465,10 @@ class CXXRecordDecl : public RecordDecl {
     /// \brief Whether we are currently parsing base specifiers.
     bool IsParsingBaseSpecifiers : 1;
 
+    /// \brief Whether this class contains at least one member or base
+    ///  class containing an HLSL vector longer than 4 elements.
+    bool HasHLSLLongVector : 1;
+
     /// \brief The number of base class specifiers in Bases.
     unsigned NumBases;
 
@@ -699,6 +703,11 @@ public:
   bool isParsingBaseSpecifiers() const {
     return data().IsParsingBaseSpecifiers;
   }
+
+  // HLSL Change
+  void setHasLongVector() {data().HasHLSLLongVector = true; }
+
+  bool hasLongVector() { return data().HasHLSLLongVector; }
 
   /// \brief Sets the base classes of this struct or class.
   void setBases(CXXBaseSpecifier const * const *Bases, unsigned NumBases);

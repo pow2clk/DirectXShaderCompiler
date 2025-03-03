@@ -72,7 +72,7 @@ CXXRecordDecl::DefinitionData::DefinitionData(CXXRecordDecl *D)
     ImplicitCopyAssignmentHasConstParam(true),
     HasDeclaredCopyConstructorWithConstParam(false),
     HasDeclaredCopyAssignmentWithConstParam(false),
-    IsLambda(false), IsParsingBaseSpecifiers(false), NumBases(0), NumVBases(0),
+    IsLambda(false), IsParsingBaseSpecifiers(false), HasHLSLLongVector(false), NumBases(0), NumVBases(0),
     Bases(), VBases(),
     Definition(D), FirstFriend() {
 }
@@ -203,6 +203,10 @@ CXXRecordDecl::setBases(CXXBaseSpecifier const * const *Bases,
     //    -- has no non-standard-layout base classes
     if (!BaseClassDecl->isStandardLayout())
       data().IsStandardLayout = false;
+
+    // Propagate presence of long vector to child classes.
+    if (BaseClassDecl->hasLongVector())
+      data().HasHLSLLongVector = true;
 
     // Record if this base is the first non-literal field or base.
     if (!hasNonLiteralTypeFieldsOrBases() && !BaseType->isLiteralType(C))
