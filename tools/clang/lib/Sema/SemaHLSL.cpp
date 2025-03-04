@@ -2865,8 +2865,8 @@ private:
   TypedefDecl *m_matrixShorthandTypes[HLSLScalarTypeCount][4][4];
 
   // Vector types already built.
-  QualType m_vectorTypes[HLSLScalarTypeCount][4];
-  TypedefDecl *m_vectorTypedefs[HLSLScalarTypeCount][4];
+  QualType m_vectorTypes[HLSLScalarTypeCount][DXIL::kDefaultMaxVectorLength];
+  TypedefDecl *m_vectorTypedefs[HLSLScalarTypeCount][DXIL::kDefaultMaxVectorLength];
 
   // BuiltinType for each scalar type.
   QualType m_baseTypes[HLSLScalarTypeCount];
@@ -3845,7 +3845,7 @@ private:
   clang::TypedefDecl *LookupVectorShorthandType(HLSLScalarType scalarType,
                                                 UINT colCount) {
     DXASSERT_NOMSG(scalarType != HLSLScalarType::HLSLScalarType_unknown &&
-                   colCount <= 4);
+                   colCount <= DXIL::kDefaultMaxVectorLength);
     TypedefDecl *qts = m_vectorTypedefs[scalarType][colCount - 1];
     if (qts == nullptr) {
       QualType type = LookupVectorType(scalarType, colCount);
@@ -3953,7 +3953,7 @@ public:
 
   QualType LookupVectorType(HLSLScalarType scalarType, unsigned int colCount) {
     QualType qt;
-    if (colCount < 4)
+    if (colCount < DXIL::kDefaultMaxVectorLength)
       qt = m_vectorTypes[scalarType][colCount - 1];
     if (qt.isNull()) {
       if (m_scalarTypes[scalarType].isNull()) {
@@ -3962,7 +3962,7 @@ public:
       qt = GetOrCreateVectorSpecialization(*m_context, m_sema,
                                            m_vectorTemplateDecl,
                                            m_scalarTypes[scalarType], colCount);
-      if (colCount < 4)
+      if (colCount < DXIL::kDefaultMaxVectorLength)
         m_vectorTypes[scalarType][colCount - 1] = qt;
     }
     return qt;
