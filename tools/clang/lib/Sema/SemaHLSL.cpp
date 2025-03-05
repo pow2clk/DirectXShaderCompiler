@@ -5262,7 +5262,7 @@ public:
         }
         m_sema->RequireCompleteType(argSrcLoc, argType, diag::err_typecheck_decl_incomplete_type);
 
-        if (ContainsLongVector(m_sema, argType)) {
+        if (ContainsLongVector(argType)) {
           m_sema->Diag(argSrcLoc, diag::err_hlsl_unsupported_long_vector)
               << DXIL::kDefaultMaxVectorLength << "cbuffers";
           return true;
@@ -5333,7 +5333,7 @@ public:
       CXXRecordDecl *Decl = arg.getAsType()->getAsCXXRecordDecl();
       if (Decl && !Decl->isCompleteDefinition())
         return true;
-      if (ContainsLongVector(m_sema, arg.getAsType())) {
+      if (ContainsLongVector(arg.getAsType())) {
         m_sema->Diag(argLoc.getLocation(),
                      diag::err_hlsl_unsupported_long_vector)
             << DXIL::kDefaultMaxVectorLength << "tessellation patches";
@@ -5350,7 +5350,7 @@ public:
       CXXRecordDecl *Decl = arg.getAsType()->getAsCXXRecordDecl();
       if (Decl && !Decl->isCompleteDefinition())
         return true;
-      if (ContainsLongVector(m_sema, arg.getAsType())) {
+      if (ContainsLongVector(arg.getAsType())) {
         m_sema->Diag(argLoc.getLocation(),
                      diag::err_hlsl_unsupported_long_vector)
             << DXIL::kDefaultMaxVectorLength << "geometry streams";
@@ -12091,14 +12091,13 @@ bool hlsl::ShouldSkipNRVO(clang::Sema &sema, clang::QualType returnType,
   return false;
 }
 
-bool hlsl::ContainsLongVector(Sema *S, QualType qt) {
+bool hlsl::ContainsLongVector(QualType qt) {
   if (qt.isNull() || qt->isDependentType())
     return false;
 
   while (const ArrayType *Arr = qt->getAsArrayTypeUnsafe())
     qt = Arr->getElementType();
 
-  
   if (CXXRecordDecl *Decl = qt->getAsCXXRecordDecl()) {
     //S->RequireCompleteType(Decl->getLocation(), qt, diag::err_typecheck_decl_incomplete_type);
     if (!Decl->isCompleteDefinition())
@@ -14745,7 +14744,7 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
       virtual void diagnose(Sema &S, SourceLocation Loc, QualType T) {}
     } SD;
     RequireCompleteType(D.getLocStart(), qt, SD);
-    if (ContainsLongVector(this, qt)) {
+    if (ContainsLongVector(qt)) {
       Diag(D.getLocStart(), diag::err_hlsl_unsupported_long_vector)
           << DXIL::kDefaultMaxVectorLength << "cbuffers";
       result = false;
@@ -15642,7 +15641,7 @@ static bool isRelatedDeclMarkedNointerpolation(Expr *E) {
 
 // Verify that user-defined intrinsic struct args contain no long vectors
 static bool CheckUDTIntrinsicArg(Sema *S, Expr *Arg) {
-  if (ContainsLongVector(S, Arg->getType())) {
+  if (ContainsLongVector(Arg->getType())) {
     S->Diag(Arg->getExprLoc(), diag::err_hlsl_unsupported_long_vector)
         << DXIL::kDefaultMaxVectorLength << "user-defined struct parameter";
     return true;
@@ -16383,12 +16382,12 @@ void DiagnoseEntry(Sema &S, FunctionDecl *FD) {
   // Check general parameter characteristics
   // Would be nice to check for resources here as they crash the compiler now.
   for (const auto *param : FD->params()) {
-    if (ContainsLongVector(&S, param->getType()))
+    if (ContainsLongVector(param->getType()))
       S.Diag(param->getLocation(), diag::err_hlsl_unsupported_long_vector)
           << DXIL::kDefaultMaxVectorLength << "entry function parameters";
   }
 
-  if (ContainsLongVector(&S, FD->getReturnType()))
+  if (ContainsLongVector(FD->getReturnType()))
     S.Diag(FD->getLocation(), diag::err_hlsl_unsupported_long_vector)
         << DXIL::kDefaultMaxVectorLength << "entry function return type";
 
