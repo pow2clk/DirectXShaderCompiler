@@ -5295,22 +5295,12 @@ public:
       // template instantiation.
       if (ArgTy->isDependentType())
         return false;
-      if (auto *recordType = ArgTy->getAs<RecordType>()) {
-        if (CXXRecordDecl *cxxRecordDecl =
-                dyn_cast<CXXRecordDecl>(recordType->getDecl())) {
-          if (ClassTemplateSpecializationDecl *templateSpecializationDecl =
-                  dyn_cast<ClassTemplateSpecializationDecl>(cxxRecordDecl)) {
-            if (templateSpecializationDecl->getSpecializationKind() ==
-                TSK_Undeclared) {
-              // Make sure specialization is done before IsTypeNumeric.
-              // If not, ArgTy might be treat as empty struct.
-              m_sema->RequireCompleteType(
-                  ArgLoc.getLocation(), ArgTy,
-                  diag::err_typecheck_decl_incomplete_type);
-            }
-          }
-        }
-      }
+      // Make sure specialization is done before IsTypeNumeric.
+      // If not, ArgTy might be treat as empty struct.
+      m_sema->RequireCompleteType(ArgLoc.getLocation(), ArgTy, diag::err_typecheck_decl_incomplete_type);
+      CXXRecordDecl *Decl = ArgTy->getAsCXXRecordDecl();
+      if (Decl && !Decl->isCompleteDefinition())
+        return true;
       // The node record type must be compound - error if it is not.
       if (GetTypeObjectKind(ArgTy) != AR_TOBJ_COMPOUND) {
         m_sema->Diag(ArgLoc.getLocation(), diag::err_hlsl_node_record_type)
@@ -5339,8 +5329,10 @@ public:
       const TemplateArgument &arg = argLoc.getArgument();
       DXASSERT(arg.getKind() == TemplateArgument::ArgKind::Type,
                "Tessellation patch requires type template arg 0");
-
       m_sema->RequireCompleteType(argLoc.getLocation(), arg.getAsType(), diag::err_typecheck_decl_incomplete_type);
+      CXXRecordDecl *Decl = arg.getAsType()->getAsCXXRecordDecl();
+      if (Decl && !Decl->isCompleteDefinition())
+        return true;
       if (ContainsLongVector(m_sema, arg.getAsType())) {
         m_sema->Diag(argLoc.getLocation(),
                      diag::err_hlsl_unsupported_long_vector)
@@ -5355,6 +5347,9 @@ public:
       DXASSERT(arg.getKind() == TemplateArgument::ArgKind::Type,
                "Geometry stream requires type template arg 0");
       m_sema->RequireCompleteType(argLoc.getLocation(), arg.getAsType(), diag::err_typecheck_decl_incomplete_type);
+      CXXRecordDecl *Decl = arg.getAsType()->getAsCXXRecordDecl();
+      if (Decl && !Decl->isCompleteDefinition())
+        return true;
       if (ContainsLongVector(m_sema, arg.getAsType())) {
         m_sema->Diag(argLoc.getLocation(),
                      diag::err_hlsl_unsupported_long_vector)
@@ -14743,13 +14738,13 @@ bool Sema::DiagnoseHLSLDecl(Declarator &D, DeclContext *DC, Expr *BitWidth,
 
   // Disallow long vecs from $Global cbuffers.
   if (isGlobal && !isStatic && !isGroupShared) {
-    if (qt->isStructureOrClassType()) {
-      if (ClassTemplateSpecializationDecl *templateSpecializationDecl =
-            dyn_cast<ClassTemplateSpecializationDecl>(qt->getAsCXXRecordDecl()))
-      if (templateSpecializationDecl->getSpecializationKind() ==
-          TSK_Undeclared)
-        RequireCompleteType(D.getLocStart(), qt, diag::err_typecheck_decl_incomplete_type);
-    }
+    // Suppress actuall emitting of errors for incompletable types here
+    // They are redundant to those produced in ActOnUninitializedDecl.
+    struct SilentDiagnoser : public TypeDiagnoser {
+      SilentDiagnoser() : TypeDiagnoser(true) { }
+      virtual void diagnose(Sema &S, SourceLocation Loc, QualType T) {}
+    } SD;
+    RequireCompleteType(D.getLocStart(), qt, SD);
     if (ContainsLongVector(this, qt)) {
       Diag(D.getLocStart(), diag::err_hlsl_unsupported_long_vector)
           << DXIL::kDefaultMaxVectorLength << "cbuffers";
