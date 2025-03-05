@@ -389,6 +389,9 @@ void CXXRecordDecl::addedClassSubobject(CXXRecordDecl *Subobj) {
     data().NeedOverloadResolutionForMoveConstructor = true;
     data().NeedOverloadResolutionForDestructor = true;
   }
+
+  if (Subobj->hasLongVector())
+    data().HasHLSLLongVector = true;
 }
 
 /// Callback function for CXXRecordDecl::forallBases that acknowledges

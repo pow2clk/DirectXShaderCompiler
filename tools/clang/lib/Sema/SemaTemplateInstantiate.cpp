@@ -2139,6 +2139,16 @@ Sema::InstantiateClass(SourceLocation PointOfInstantiation,
               SourceLocation(), SourceLocation(), nullptr);
   CheckCompletedCXXClass(Instantiation);
 
+  if (ClassTemplateSpecializationDecl *Spec
+        = dyn_cast<ClassTemplateSpecializationDecl>(Instantiation))
+    if (Spec->getName() == "vector") {
+      const TemplateArgumentList &argList = Spec->getTemplateArgs();
+      const TemplateArgument &arg1 = argList[1];
+      llvm::APSInt vecSize = arg1.getAsIntegral();
+      if (vecSize.getLimitedValue() > 4)
+        Instantiation->setHasLongVector();
+    }
+
   // Default arguments are parsed, if not instantiated. We can go instantiate
   // default arg exprs for default constructors if necessary now.
   ActOnFinishCXXMemberDefaultArgs(Instantiation);
