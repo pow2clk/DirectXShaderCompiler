@@ -4111,41 +4111,20 @@ static Value *GenerateBufLd(hlsl::OP *OP, IRBuilder<> &Builder,
                             unsigned NumElements, ArrayRef<Value *> Args,
                             std::vector<Value *>::iterator EltIt);
 
-Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
-                        IRBuilder<> &Builder, hlsl::OP *OP,
-                        const DataLayout &DL) {
-  // Collect information about the resource type.
-  Type *Ty = helper.Ty;
-  Type *EltTy = Ty->getScalarType();
-  unsigned numComponents = 1;
+// Sets up arguments for buffer load call.
+static SmallVector<Value *, 12>
+GetBufLoadArgs(ResLoadHelper helper, HLResource::Kind RK, IRBuilder<> Builder,
+               Type *EltTy, unsigned EltSize) {
+  OP::OpCode opcode = helper.opcode;
+  llvm::Constant *opArg = Builder.getInt32((uint32_t)opcode);
 
-  if (Ty->isVectorTy()) {
-    numComponents = Ty->getVectorNumElements();
-  }
-
-  Type *i32Ty = Builder.getInt32Ty();
-  Type *i64Ty = Builder.getInt64Ty();
-  Type *doubleTy = Builder.getDoubleTy();
-  const bool isTyped = DXIL::IsTyped(RK);
-  const bool is64 = (EltTy == i64Ty || EltTy == doubleTy);
-  const bool isBool = EltTy->isIntegerTy(1);
-  if (isBool || (is64 && isTyped))
-    // Value will be loaded in its memory representation.
-    EltTy = i32Ty;
-
-  unsigned EltSize = DL.getTypeAllocSize(EltTy);
   unsigned alignment = RK == DxilResource::Kind::RawBuffer ? 4U : 8U;
   alignment = std::min(alignment, EltSize);
-  Constant *alignmentVal = OP->GetI32Const(alignment);
-
-  std::vector<Value *> elts(numComponents);
-  OP::OpCode opcode = helper.opcode;
-  llvm::Constant *opArg = OP->GetU32Const((unsigned)opcode);
+  Constant *alignmentVal = Builder.getInt32(alignment);
 
   // Assemble args is specific to the type bab/struct/typed
   // Typed needs to handle the possibility of vector coords
   // Raws need to calculate alignment and mask values.
-  llvm::Value *undefI = llvm::UndefValue::get(i32Ty);
   SmallVector<Value *, 12> Args;
   Args.emplace_back(opArg);         // opcode @0
   Args.emplace_back(helper.handle); // resource handle @1
@@ -4153,6 +4132,8 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   // Set offsets appropriate for the load operation.
   bool isVectorAddr = helper.addr->getType()->isVectorTy();
   if (opcode == OP::OpCode::TextureLoad) {
+    llvm::Value *undefI = llvm::UndefValue::get(Builder.getInt32Ty());
+
     // Set mip level or sample for MS texutures @3.
     Args.emplace_back(helper.mipLevel);
     // Set texture coords according to resource kind @4-6
@@ -4179,9 +4160,9 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
     }
   } else {
     // coord (may be changed later) @2
-    Args.emplace_back(isVectorAddr
-                          ? Builder.CreateExtractElement(helper.addr, 0UL)
-                          : helper.addr);
+    Args.emplace_back(
+        isVectorAddr ? Builder.CreateExtractElement(helper.addr, (uint64_t)0)
+                     : helper.addr);
     Args.emplace_back(helper.offset); // offset (may be changed later) @3
     if (opcode == OP::OpCode::RawBufferLoad) {
       // Unlike typed buffer load, raw buffer load has mask and alignment.
@@ -4189,12 +4170,43 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
       Args.emplace_back(alignmentVal); // alignment @5
     }
   }
+  return Args;
+}
+
+// Emits as many calls as needed to load the full vector
+// Performs any needed extractions and conversions of the results.
+Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
+                        IRBuilder<> &Builder, hlsl::OP *OP,
+                        const DataLayout &DL) {
+  Type *Ty = helper.Ty;
+  Type *EltTy = Ty->getScalarType();
+  unsigned numComponents = 1;
+  if (Ty->isVectorTy()) {
+    numComponents = Ty->getVectorNumElements();
+  }
+
+  Type *i32Ty = Builder.getInt32Ty();
+  Type *i64Ty = Builder.getInt64Ty();
+  Type *doubleTy = Builder.getDoubleTy();
+  const bool isTyped = DXIL::IsTyped(RK);
+  const bool is64 = (EltTy == i64Ty || EltTy == doubleTy);
+  const bool isBool = EltTy->isIntegerTy(1);
+  if (isBool || (is64 && isTyped))
+    // Value will be loaded in its memory representation.
+    EltTy = i32Ty;
+  unsigned EltSize = DL.getTypeAllocSize(EltTy);
+
+  std::vector<Value *> elts(numComponents);
+  OP::OpCode OpCode = helper.opcode;
+
+  SmallVector<Value *, 12> Args = GetBufLoadArgs(helper, RK, Builder, EltTy, EltSize);
+
   const unsigned kCoordIdx = 2;
   const unsigned kOffsetIdx = 3;
   const unsigned kMaskIdx = 4;
 
   // Keep track of the first load for debug info migration.
-  Value *firstLd = nullptr;
+  Value *FirstLd = nullptr;
   // Create calls to function object.
   // Typed buffer loads are limited to one load of up to 4 32-bit values.
   // Raw buffer loads might need multiple loads in chunks of 4.
@@ -4202,24 +4214,25 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
     unsigned chunkSize = (numComponents - i) <= 4 ? numComponents - i : 4;
 
     // Assign mask for raw buffer loads.
-    if (opcode == OP::OpCode::RawBufferLoad)
+    if (OpCode == OP::OpCode::RawBufferLoad)
       Args[kMaskIdx] = GetRawBufferMaskForETy(EltTy, chunkSize, OP);
 
-    Value *Ld = GenerateBufLd(OP, Builder, opcode, Ty->getScalarType(),
+    Value *Ld = GenerateBufLd(OP, Builder, OpCode, Ty->getScalarType(),
                               chunkSize, Args, elts.begin() + i);
     i += chunkSize;
 
     // Update status.
     UpdateStatus(Ld, helper.status, Builder, OP);
 
-    if (!firstLd)
-      firstLd = Ld;
+    if (!FirstLd)
+      FirstLd = Ld;
 
-    if (opcode == OP::OpCode::RawBufferLoad && i < numComponents) {
+    if (OpCode == OP::OpCode::RawBufferLoad && i < numComponents) {
       if (RK == DxilResource::Kind::RawBuffer)
         // Raw buffers can't use offset param. Add to coord index.
-        Args[kCoordIdx] =
-            Builder.CreateAdd(Args[kCoordIdx], OP->GetU32Const(4 * EltSize));
+        Args[kCoordIdx] = Builder.CreateAdd(
+            Args[kCoordIdx],
+            OP->GetU32Const(4 * EltSize));
       else
         // Structured buffers increment the offset parameter.
         Args[kOffsetIdx] =
@@ -4229,7 +4242,7 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
 
   Value *retValNew = ScalarizeElements(Ty, elts, Builder);
 
-  DXASSERT(firstLd, "No loads created by TranslateBufLoad");
+  DXASSERT(FirstLd, "No loads created by TranslateBufLoad");
 
   if (isBool) {
     // Convert result back to register representation.
@@ -4240,7 +4253,7 @@ Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
   helper.retVal->replaceAllUsesWith(retValNew);
   helper.retVal = retValNew;
 
-  return firstLd;
+  return FirstLd;
 }
 
 Value *TranslateResourceLoad(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
