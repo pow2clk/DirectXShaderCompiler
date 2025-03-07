@@ -3985,23 +3985,17 @@ struct ResLoadHelper {
   // Default constructor uses CI load intrinsic call
   //  to get the retval and various location indicators.
   ResLoadHelper(CallInst *CI, DxilResource::Kind RK, DxilResourceBase::Class RC,
-                Value *h, IntrinsicOp IOP, bool bForSubscript = false);
+                Value *h, IntrinsicOp IOP, LoadInst *TyBufSubLoad = nullptr);
   // Alternative constructor explicitly sets the index.
   // Used for some subscript operators.
   ResLoadHelper(Instruction *ldInst, DxilResource::Kind RK, Value *h,
-                Value *idx, Value *mip = nullptr)
+                Value *idx, Value *Offset, Value *mip = nullptr)
       : intrinsicOpCode(IntrinsicOp::Num_Intrinsics), handle(h), retVal(ldInst),
-        addr(idx), offset(nullptr), status(nullptr), mipLevel(mip) {
+        addr(idx), offset(Offset), status(nullptr), mipLevel(mip) {
     opcode = LoadOpFromResKind(RK);
-    if (opcode == OP::OpCode::RawBufferLoad && Ty->isVectorTy() &&
+    if (opcode == OP::OpCode::RawBufferLoad && ldInst->getType()->isVectorTy() &&
         ldInst->getModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
       opcode = OP::OpCode::RawBufferVectorLoad;
-    Type *i32Ty = IRBuilder<>(ldInst).getInt32Ty();
-    if (DXIL::IsStructuredBuffer(RK))
-      offset = ConstantInt::get(i32Ty, 0U);
-    else
-      offset = UndefValue::get(i32Ty);
-    Ty = ldInst->getType();
   }
   OP::OpCode opcode;
   IntrinsicOp intrinsicOpCode;
@@ -4013,16 +4007,25 @@ struct ResLoadHelper {
   Value *offset;
   Value *status;
   Value *mipLevel;
-  Type *Ty;
 };
 
+// Uses CI arguments to determine the index, offset, and mipLevel also depending
+// on the RK/RC resource kind and class, which determine the opcode.
+// Handle and IOP are set explicitly.
+// For typed buffer loads, the call instruction feeds into a load
+// represented by TyBufSubLoad which determines the instruction to replace.
+// Otherwise, CI is replaced.
 ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
                              DxilResourceBase::Class RC, Value *hdl,
-                             IntrinsicOp IOP, bool bForSubscript)
-    : intrinsicOpCode(IOP), handle(hdl), offset(nullptr), status(nullptr) {
+                             IntrinsicOp IOP, LoadInst *TyBufSubLoad)
+  : intrinsicOpCode(IOP), handle(hdl), offset(nullptr), status(nullptr) {
   opcode = LoadOpFromResKind(RK);
-  retVal = CI;
-  Ty = CI->getType();
+  bool bForSubscript = false;
+  if (TyBufSubLoad) {
+    bForSubscript = true;
+    retVal = TyBufSubLoad;
+  } else
+    retVal = CI;
   const unsigned kAddrIdx = HLOperandIndex::kBufLoadAddrOpIdx;
   addr = CI->getArgOperand(kAddrIdx);
   unsigned argc = CI->getNumArgOperands();
@@ -4086,7 +4089,7 @@ ResLoadHelper::ResLoadHelper(CallInst *CI, DxilResource::Kind RK,
         status = CI->getArgOperand(kStatusIdx);
     }
   } else {
-    if (opcode == OP::OpCode::RawBufferLoad && Ty->isVectorTy() &&
+    if (opcode == OP::OpCode::RawBufferLoad && retVal->getType()->isVectorTy() &&
         CI->getModule()->GetHLModule().GetShaderModel()->IsSM69Plus())
       opcode = OP::OpCode::RawBufferVectorLoad;
     const unsigned kStatusIdx = HLOperandIndex::kBufLoadStatusOpIdx;
@@ -4214,7 +4217,7 @@ GetBufLoadArgs(ResLoadHelper helper, HLResource::Kind RK, IRBuilder<> Builder,
 Value *TranslateBufLoad(ResLoadHelper &helper, HLResource::Kind RK,
                         IRBuilder<> &Builder, hlsl::OP *OP,
                         const DataLayout &DL) {
-  Type *Ty = helper.Ty;
+  Type *Ty = helper.retVal->getType();
   Type *EltTy = Ty->getScalarType();
   unsigned numComponents = 1;
   if (Ty->isVectorTy()) {
@@ -7977,9 +7980,9 @@ Value *TranslateStructBufMatLd(CallInst *CI, IRBuilder<> &Builder,
   Value *ptr = CI->getArgOperand(HLOperandIndex::kMatLoadPtrOpIdx);
   Type *matType = ptr->getType()->getPointerElementType();
   HLMatrixType MatTy = HLMatrixType::cast(matType);
-  ResLoadHelper helper(CI, RK, handle, bufIdx);
-  helper.Ty = MatTy.getLoweredVectorType(false /*MemRepr*/);
-  helper.offset = baseOffset;
+  ResLoadHelper helper(CI, RK, handle, bufIdx, baseOffset);
+  DXASSERT(MatTy.getLoweredVectorType(false /*MemRepr*/) == helper.retVal->getType(),
+           "helper type should match vectorized matrix");
   return TranslateBufLoad(helper, RK, Builder, OP, DL);
 }
 
@@ -8321,8 +8324,7 @@ void TranslateStructBufSubscriptUser(Instruction *user, Value *handle,
     }
   } else if (LoadInst *ldInst = dyn_cast<LoadInst>(user)) {
     // Load of scalar/vector within a struct or structured raw load.
-    ResLoadHelper helper(ldInst, ResKind, handle, bufIdx);
-    helper.offset = baseOffset;
+    ResLoadHelper helper(ldInst, ResKind, handle, bufIdx, baseOffset);
     TranslateBufLoad(helper, ResKind, Builder, OP, DL);
 
     ldInst->eraseFromParent();
@@ -8436,14 +8438,13 @@ void TranslateStructBufSubscript(CallInst *CI, Value *handle, Value *status,
 namespace {
 
 Value *TranslateTypedBufLoad(CallInst *CI, DXIL::ResourceKind RK,
-                             DXIL::ResourceClass RC, Value *handle,
-                             LoadInst *ldInst, IRBuilder<> &Builder,
-                             hlsl::OP *hlslOP, const DataLayout &DL) {
-  ResLoadHelper ldHelper(CI, RK, RC, handle, IntrinsicOp::MOP_Load,
-                         /*bForSubscript*/ true);
-  // use ldInst as retVal
-  ldHelper.retVal = ldInst;
-  ldHelper.Ty = ldInst->getType();
+                                  DXIL::ResourceClass RC, Value *handle,
+                                  LoadInst *ldInst, IRBuilder<> &Builder,
+                                  hlsl::OP *hlslOP, const DataLayout &DL) {
+
+  // The arguments to the call instruction are used to determine the access,
+  // the return value and type come from the load instruction.
+  ResLoadHelper ldHelper(CI, RK, RC, handle, IntrinsicOp::MOP_Load, ldInst);
   TranslateBufLoad(ldHelper, RK, Builder, hlslOP, DL);
   // delete the ld
   ldInst->eraseFromParent();
@@ -8488,8 +8489,8 @@ Value *UpdateVectorElt(Value *VecVal, Value *EltVal, Value *EltIdx,
 }
 
 void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
-                               HLObjectOperationLowerHelper *pObjHelper,
-                               bool &Translated) {
+                                  HLObjectOperationLowerHelper *pObjHelper,
+                                  bool &Translated) {
   Value *ptr = CI->getArgOperand(HLOperandIndex::kSubscriptObjectOpIdx);
 
   hlsl::OP *hlslOP = &helper.hlslOP;
@@ -8506,7 +8507,7 @@ void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
     IRBuilder<> Builder(I);
     if (LoadInst *ldInst = dyn_cast<LoadInst>(user)) {
       TranslateTypedBufLoad(CI, RK, RC, handle, ldInst, Builder, hlslOP,
-                            helper.dataLayout);
+                                 helper.dataLayout);
     } else if (StoreInst *stInst = dyn_cast<StoreInst>(user)) {
       Value *val = stInst->getValueOperand();
       TranslateStore(RK, handle, val,
@@ -8721,7 +8722,13 @@ void TranslateHLSubscript(CallInst *CI, HLSubscriptOpcode opcode,
     DXASSERT(CI->hasOneUse(), "subscript should only have one use");
     IRBuilder<> Builder(CI);
     if (LoadInst *ldInst = dyn_cast<LoadInst>(*U)) {
-      ResLoadHelper ldHelper(ldInst, RK, handle, coord, mipLevel);
+      Type *i32Ty = IRBuilder<>(ldInst).getInt32Ty();
+      Value *Offset = nullptr;
+      if (DXIL::IsStructuredBuffer(RK))
+        Offset = ConstantInt::get(i32Ty, 0U);
+      else
+        Offset = UndefValue::get(i32Ty);
+      ResLoadHelper ldHelper(ldInst, RK, handle, coord, Offset, mipLevel);
       TranslateBufLoad(ldHelper, RK, Builder, hlslOP, helper.dataLayout);
       ldInst->eraseFromParent();
     } else {
