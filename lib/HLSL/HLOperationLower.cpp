@@ -8437,7 +8437,7 @@ void TranslateStructBufSubscript(CallInst *CI, Value *handle, Value *status,
 // HLSubscript.
 namespace {
 
-Value *TranslateTypedBufLoad(CallInst *CI, DXIL::ResourceKind RK,
+Value *TranslateTypedBufSubscript(CallInst *CI, DXIL::ResourceKind RK,
                                   DXIL::ResourceClass RC, Value *handle,
                                   LoadInst *ldInst, IRBuilder<> &Builder,
                                   hlsl::OP *hlslOP, const DataLayout &DL) {
@@ -8488,7 +8488,7 @@ Value *UpdateVectorElt(Value *VecVal, Value *EltVal, Value *EltIdx,
   return VecVal;
 }
 
-void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
+void TranslateTypedBufferSubscript(CallInst *CI, HLOperationLowerHelper &helper,
                                   HLObjectOperationLowerHelper *pObjHelper,
                                   bool &Translated) {
   Value *ptr = CI->getArgOperand(HLOperandIndex::kSubscriptObjectOpIdx);
@@ -8506,7 +8506,7 @@ void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
     Instruction *I = cast<Instruction>(user);
     IRBuilder<> Builder(I);
     if (LoadInst *ldInst = dyn_cast<LoadInst>(user)) {
-      TranslateTypedBufLoad(CI, RK, RC, handle, ldInst, Builder, hlslOP,
+      TranslateTypedBufSubscript(CI, RK, RC, handle, ldInst, Builder, hlslOP,
                                  helper.dataLayout);
     } else if (StoreInst *stInst = dyn_cast<StoreInst>(user)) {
       Value *val = stInst->getValueOperand();
@@ -8529,7 +8529,7 @@ void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
           // Generate Ld.
           LoadInst *tmpLd = StBuilder.CreateLoad(CI);
 
-          Value *ldVal = TranslateTypedBufLoad(
+          Value *ldVal = TranslateTypedBufSubscript(
               CI, RK, RC, handle, tmpLd, StBuilder, hlslOP, helper.dataLayout);
           // Update vector.
           ldVal = UpdateVectorElt(ldVal, SI->getValueOperand(), EltIdx,
@@ -8549,7 +8549,7 @@ void TranslateDefaultSubscript(CallInst *CI, HLOperationLowerHelper &helper,
           // Generate tmp vector load with vector type & translate it
           LoadInst *tmpLd = LdBuilder.CreateLoad(CI);
 
-          Value *ldVal = TranslateTypedBufLoad(
+          Value *ldVal = TranslateTypedBufSubscript(
               CI, RK, RC, handle, tmpLd, LdBuilder, hlslOP, helper.dataLayout);
 
           // get the single element
@@ -8767,7 +8767,7 @@ void TranslateHLSubscript(CallInst *CI, HLSubscriptOpcode opcode,
         TranslateStructBufSubscript(CI, handle, /*status*/ nullptr, hlslOP, RK,
                                     helper.dataLayout);
       else
-        TranslateDefaultSubscript(CI, helper, pObjHelper, Translated);
+        TranslateTypedBufferSubscript(CI, helper, pObjHelper, Translated);
 
       return;
     }
