@@ -10,8 +10,6 @@
 //                                                                           //
 ///////////////////////////////////////////////////////////////////////////////
 
-#include "dxc/DXIL/DxilModule.h"
-
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
@@ -34,6 +32,7 @@ namespace {
 class DxilEliminateVector : public FunctionPass {
 public:
   static char ID;
+  bool SupportsVectors;
   DxilEliminateVector() : FunctionPass(ID) {
     initializeDxilEliminateVectorPass(*PassRegistry::getPassRegistry());
   }
@@ -153,10 +152,6 @@ bool DxilEliminateVector::TryRewriteDebugInfoForVector(InsertElementInst *IE) {
 
 bool DxilEliminateVector::runOnFunction(Function &F) {
 
-  if (F.getParent()->HasDxilModule())
-    if (F.getParent()->GetDxilModule().GetShaderModel()->IsSM69Plus())
-      return false;
-
   auto *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   DxilValueCache *DVC = &getAnalysis<DxilValueCache>();
 
@@ -169,8 +164,9 @@ bool DxilEliminateVector::runOnFunction(Function &F) {
       if (isa<InsertElementInst>(&I) || isa<ExtractElementInst>(&I))
         VectorInsts.push_back(&I);
       else if (AllocaInst *AI = dyn_cast<AllocaInst>(&I)) {
-        if (AI->getAllocatedType()->isVectorTy() &&
-            llvm::isAllocaPromotable(AI))
+        Type * ATy = AI->getAllocatedType();
+        if (ATy->isVectorTy() && llvm::isAllocaPromotable(AI) &&
+            (!SupportsVectors || ATy->getVectorNumElements() == 1))
           VectorAllocas.push_back(AI);
       }
   }
