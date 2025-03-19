@@ -212,8 +212,8 @@ private:
 };
 
 void DynamicIndexingVectorToArray::initialize(Module &M) {
-  if (M.HasHLModule())
-    SupportsVectors = M.GetHLModule().GetShaderModel()->IsSM69Plus();
+  HLModule *HLM = &M.GetOrCreateHLModule();
+  SupportsVectors = HLM->GetShaderModel()->IsSM69Plus();
 }
 
 void DynamicIndexingVectorToArray::applyOptions(PassOptions O) {
