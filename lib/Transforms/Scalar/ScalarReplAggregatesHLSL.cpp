@@ -1983,11 +1983,10 @@ bool SROAGlobalAndAllocas(HLModule &HLM, bool bHasDbgInfo) {
       } else {
         // SROA_Parameter_HLSL has no access to a domtree, if one is needed,
         // it'll be generated
-        //if (!SupportsVectors)
-          SROAed = SROA_Helper::DoScalarReplacement(
-              GV, Elts, Builder, bFlatVector, SupportsVectors,
-              // TODO: set precise.
-              /*hasPrecise*/ false, typeSys, DL, DeadInsts, /*DT*/ nullptr);
+        SROAed = SROA_Helper::DoScalarReplacement(
+            GV, Elts, Builder, bFlatVector, SupportsVectors,
+            // TODO: set precise.
+            /*hasPrecise*/ false, typeSys, DL, DeadInsts, /*DT*/ nullptr);
       }
 
       if (SROAed) {
@@ -3251,6 +3250,10 @@ bool SROA_Helper::DoScalarReplacement(GlobalVariable *GV,
     } else if (ElTy->isVectorTy()) {
       // Skip vector if required.
       if (!bFlatVector)
+        return false;
+
+      // Skip vector where supported if it has more than 1 element.
+      if (SupportsVectors && ElTy->getVectorNumElements() > 1)
         return false;
 
       // for array of vector
