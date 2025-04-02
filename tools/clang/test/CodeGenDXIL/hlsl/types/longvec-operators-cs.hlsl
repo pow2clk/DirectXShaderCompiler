@@ -1,5 +1,5 @@
-// RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=float -DNUM=2 %s | FileCheck %s --check-prefixes=CHECK,NODBL,NOINT
-// RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=float -DNUM=17 %s | FileCheck %s --check-prefixes=CHECK,NODBL,NOINT
+// RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=float    -DNUM=2 %s | FileCheck %s --check-prefixes=CHECK,NODBL,NOINT
+// RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=float    -DNUM=17 %s | FileCheck %s --check-prefixes=CHECK,NODBL,NOINT
 // RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=int      -DNUM=2 -DINT %s | FileCheck %s --check-prefixes=CHECK,NODBL,INT,SIG
 // RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=uint     -DNUM=5 -DINT %s | FileCheck %s --check-prefixes=CHECK,NODBL,INT,UNSIG
 // RUN: %dxc -HV 2018 -T cs_6_9 -DTYPE=double   -DNUM=3 -DDBL %s | FileCheck %s --check-prefixes=CHECK,DBL,NOINT
@@ -24,12 +24,12 @@
 // CHECK-DAG: %dx.types.ResRet.[[STY:[a-z][0-9]*]] = type { [[STYPE:[a-z0-9_]*]]
 // CHECK-DAG: %dx.types.ResRet.[[ITY:v[0-9]*i32]] = type { <[[NUM]] x i32>
 
-export void assignments(inout vector<TYPE, NUM> things[11], TYPE scales[10]);
-export vector<TYPE, NUM> arithmetic(inout vector<TYPE, NUM> things[11])[11];
-export vector<TYPE, NUM> scarithmetic(vector<TYPE, NUM> things[11], TYPE scales[10])[11];
-export vector<bool, NUM> logic(vector<bool, NUM> truth[10], vector<TYPE, NUM> consequences[11])[10];
-export vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i, TYPE val)[11];
-export void bittwiddlers(inout vector<TYPE, NUM> things[13]);
+void assignments(inout vector<TYPE, NUM> things[11], TYPE scales[10]);
+vector<TYPE, NUM> arithmetic(inout vector<TYPE, NUM> things[11])[11];
+vector<TYPE, NUM> scarithmetic(vector<TYPE, NUM> things[11], TYPE scales[10])[11];
+vector<bool, NUM> logic(vector<bool, NUM> truth[10], vector<TYPE, NUM> consequences[11])[10];
+vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i)[11];
+void bittwiddlers(inout vector<TYPE, NUM> things[13]);
 
 struct Viface {
   vector<TYPE, NUM> values[11];
@@ -43,19 +43,16 @@ struct Liface {
   vector<bool, NUM> values[10];
 };
 
-struct Biface {
+struct Binface {
   vector<TYPE, NUM> values[13];
 };
 
-// Requires vector loading support. Enable when available.
 RWStructuredBuffer<Viface> Input : register(u11);
 RWStructuredBuffer<Viface> Output : register(u12);
 RWStructuredBuffer<Siface> Scales : register(u13);
 RWStructuredBuffer<Liface> Truths : register(u14);
-RWStructuredBuffer<Biface> Bits : register(u15);
+RWStructuredBuffer<Binface> Bits : register(u15);
 RWStructuredBuffer<vector<uint,13> > Offsets : register(u16);
-
-TYPE g_val;
 
 [shader("compute")]
 [numthreads(8,1,1)]
@@ -130,7 +127,7 @@ void main(uint3 GID : SV_GroupThreadID) {
   Output[OutIx+2].values = arithmetic(Input[InIx1+2].values);
   Output[OutIx+3].values = scarithmetic(Input[InIx1+3].values, Scales[InIx2+3].values);
   Truths[OutIx+4].values = logic(Truths[InIx2+4].values, Input[InIx1+4].values);
-  Output[OutIx+5].values = index(Input[InIx1+5].values, InIx2+5, g_val);
+  Output[OutIx+5].values = index(Input[InIx1+5].values, InIx2+5);
 #ifdef INT
   bittwiddlers(Bits[InIx1+6].values);
 #endif
@@ -523,7 +520,7 @@ vector<bool, NUM> logic(vector<bool, NUM> truth[10], vector<TYPE, NUM> consequen
 static const int Ix = 2;
 
 // Test indexing operators
-vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i, TYPE val)[11] {
+vector<TYPE, NUM> index(vector<TYPE, NUM> things[11], int i)[11] {
   vector<TYPE, NUM> res[11];
 
   // CHECK: [[ResIx:%.*]] = add i32 [[OutIx]], 5
