@@ -1521,7 +1521,7 @@ class db_dxil(object):
                 "hf",
                 "rn",
                 [
-                    db_dxil_param(0, "i1", "", "operation result"),
+                    db_dxil_param(0, "ovi1", "", "operation result"),
                     db_dxil_param(2, "$o", "value", "input value"),
                 ],
                 counters=("floats",),
@@ -1569,10 +1569,10 @@ class db_dxil(object):
                 next_op_idx,
                 "UnaryBits",
                 "returns the " + i,
-                "wil",
+                "wil<",
                 "rn",
                 [
-                    db_dxil_param(0, "i32", "", "operation result"),
+                    db_dxil_param(0, "ovi32", "", "operation result"),
                     db_dxil_param(2, "$o", "value", "input value"),
                 ],
                 counters=("uints",),
@@ -1584,10 +1584,10 @@ class db_dxil(object):
                 next_op_idx,
                 "UnaryBits",
                 "returns src != 0? (BitWidth-1 - " + i + ") : -1",
-                "wil",
+                "wil<",
                 "rn",
                 [
-                    db_dxil_param(0, "i32", "", "operation result"),
+                    db_dxil_param(0, "ovi32", "", "operation result"),
                     db_dxil_param(2, "$o", "value", "input value"),
                 ],
                 counters=("uints",),
@@ -3075,7 +3075,7 @@ class db_dxil(object):
             "hfd18wil",
             "",
             [
-                db_dxil_param(0, "i1", "", "operation result"),
+                db_dxil_param(0, "ovi1", "", "operation result"),
                 db_dxil_param(2, "$o", "value", "value to compare"),
             ],
         )
@@ -5033,7 +5033,7 @@ class db_dxil(object):
             "1",
             "",
             [
-                db_dxil_param(0, "i1", "", "result - uniform across quad"),
+                db_dxil_param(0, "ovi1", "", "result - uniform across quad"),
                 db_dxil_param(2, "i1", "cond", "condition"),
                 db_dxil_param(
                     3,

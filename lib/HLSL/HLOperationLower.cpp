@@ -469,8 +469,8 @@ Value *TrivialDxilOperation(Function *dxilFunc, OP::OpCode opcode,
 }
 
 // Creates a native vector call to for a "trivial" operation where only a single
-// call instruction is needed. The overload and return types are the same vector
-// type `Ty`.
+// call instruction is needed and the main parameter type `Ty` matches the
+// return type.
 // Utility objects `HlslOp` and `Builder` are used to create a call to the given
 // `DxilFunc` with `RefArgs` arguments.
 Value *TrivialDxilVectorOperation(Function *Func, OP::OpCode Opcode,
@@ -534,7 +534,8 @@ Value *TrivialUnaryOperationRet(CallInst *CI, IntrinsicOp IOP,
   Constant *OpArg = OP->GetU32Const((unsigned)Opcode);
   Value *Args[] = {OpArg, Src};
 
-  return TrivialDxilOperation(Opcode, Args, Ty, RetTy, OP, Builder);
+  return TrivialDxilOperation(Opcode, Args, Ty, RetTy, OP, Builder,
+                              Helper.M.GetShaderModel()->IsSM69Plus());
 }
 
 Value *TrivialDxilUnaryOperation(OP::OpCode Opcode, Value *Src, hlsl::OP *OP,
@@ -2088,41 +2089,62 @@ Value *TranslateFirstbitHi(CallInst *CI, IntrinsicOp IOP, OP::OpCode Opcode,
                            HLOperationLowerHelper &Helper,
                            HLObjectOperationLowerHelper *ObjHelper,
                            bool &Translated) {
-  Value *FirstbitHi =
-      TrivialUnaryOperationRet(CI, IOP, Opcode, Helper, ObjHelper, Translated);
-  // firstbitHi == -1? -1 : (bitWidth-1 -firstbitHi);
+  hlsl::OP *OP = &Helper.hlslOP;
   IRBuilder<> Builder(CI);
-  Constant *Neg1 = Builder.getInt32(-1);
   Value *Src = CI->getArgOperand(HLOperandIndex::kUnaryOpSrc0Idx);
 
   Type *Ty = Src->getType();
+  Type *RetTy = Type::getInt32Ty(CI->getContext());
+  unsigned NumElements = 0;
+  if (Ty->isVectorTy()) {
+    NumElements = Ty->getVectorNumElements();
+    RetTy = VectorType::get(RetTy, NumElements);
+  }
+
+  Constant *OpArg = OP->GetU32Const((unsigned)Opcode);
+  Value *Args[] = {OpArg, Src};
+
+  Value *FirstbitHi =
+    TrivialDxilOperation(Opcode, Args, Ty, RetTy, OP, Builder,
+                         Helper.M.GetShaderModel()->IsSM69Plus());
+
+
+  // firstbitHi == -1? -1 : (bitWidth-1 -firstbitHi);
   IntegerType *EltTy = cast<IntegerType>(Ty->getScalarType());
+  Constant *Neg1 = Builder.getInt32(-1);
   Constant *BitWidth = Builder.getInt32(EltTy->getBitWidth() - 1);
 
-  if (Ty == Ty->getScalarType()) {
-    Value *Sub = Builder.CreateSub(BitWidth, FirstbitHi);
-    Value *Cond = Builder.CreateICmpEQ(Neg1, FirstbitHi);
-    return Builder.CreateSelect(Cond, Neg1, Sub);
-  } else {
-    Value *Result = UndefValue::get(CI->getType());
-    unsigned VecSize = Ty->getVectorNumElements();
-    for (unsigned I = 0; I < VecSize; I++) {
-      Value *EltFirstBit = Builder.CreateExtractElement(FirstbitHi, I);
-      Value *Sub = Builder.CreateSub(BitWidth, EltFirstBit);
-      Value *Cond = Builder.CreateICmpEQ(Neg1, EltFirstBit);
-      Value *Elt = Builder.CreateSelect(Cond, Neg1, Sub);
-      Result = Builder.CreateInsertElement(Result, Elt, I);
-    }
-    return Result;
+  if (NumElements > 0) {
+    Neg1 = ConstantVector::getSplat(NumElements, Neg1);
+    BitWidth = ConstantVector::getSplat(NumElements, BitWidth);
   }
+
+  Value *Sub = Builder.CreateSub(BitWidth, FirstbitHi);
+  Value *Cond = Builder.CreateICmpEQ(Neg1, FirstbitHi);
+  return Builder.CreateSelect(Cond, Neg1, Sub);
 }
 
 Value *TranslateFirstbitLo(CallInst *CI, IntrinsicOp IOP, OP::OpCode Opcode,
                            HLOperationLowerHelper &Helper,
                            HLObjectOperationLowerHelper *ObjHelper,
                            bool &Translated) {
-  return TrivialUnaryOperationRet(CI, IOP, Opcode, Helper, ObjHelper,
-                                  Translated);
+  hlsl::OP *OP = &Helper.hlslOP;
+  IRBuilder<> Builder(CI);
+  Value *Src = CI->getArgOperand(HLOperandIndex::kUnaryOpSrc0Idx);
+
+  Type *Ty = Src->getType();
+  Type *RetTy = Type::getInt32Ty(CI->getContext());
+  if (Ty->isVectorTy())
+    RetTy = VectorType::get(RetTy, Ty->getVectorNumElements());
+
+  Constant *OpArg = OP->GetU32Const((unsigned)Opcode);
+  Value *Args[] = {OpArg, Src};
+
+  Value *FirstbitLo =
+    TrivialDxilOperation(Opcode, Args, Ty, RetTy, OP, Builder,
+                         Helper.M.GetShaderModel()->IsSM69Plus());
+
+  return FirstbitLo;
 }
 
 Value *TranslateLit(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
@@ -2366,6 +2388,8 @@ Value *TranslateFUIBinary(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
                                 Translated);
 }
 
+// Choose the opcode based on the type and then generate the trivial dxil op.
+// Used by imad and umad, but will convert either into fmad if needed.
 Value *TranslateFUITrinary(CallInst *CI, IntrinsicOp IOP, OP::OpCode opcode,
                            HLOperationLowerHelper &helper,
                            HLObjectOperationLowerHelper *pObjHelper,
