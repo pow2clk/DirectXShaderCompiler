@@ -9,12 +9,6 @@
 // RUN: %dxc -DFUNC=isinf       -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
 // RUN: %dxc -DFUNC=isnan       -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
 // RUN: %dxc -DFUNC=modf        -DARITY=2 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddx         -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddx_coarse  -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddx_fine    -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddy         -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddy_coarse  -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=ddy_fine    -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
 // RUN: %dxc -DFUNC=fwidth      -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
 // RUN: %dxc -DFUNC=QuadReadLaneAt         -DARITY=4 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,QUAD
 // RUN: %dxc -DFUNC=QuadReadAcrossX        -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,QUAD

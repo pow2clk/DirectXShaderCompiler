@@ -38,6 +38,7 @@ class DxilConvergentMark : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
   explicit DxilConvergentMark() : ModulePass(ID) {}
+  bool SupportsVectors = false;
 
   StringRef getPassName() const override { return "DxilConvergentMark"; }
 
@@ -47,6 +48,7 @@ public:
       if (!SM->IsPS() && !SM->IsLib() &&
           (!SM->IsSM66Plus() || (!SM->IsCS() && !SM->IsMS() && !SM->IsAS())))
         return false;
+      SupportsVectors = SM->IsSM69Plus();
     }
     bool bUpdated = false;
 
@@ -87,18 +89,28 @@ char DxilConvergentMark::ID = 0;
 
 void DxilConvergentMark::MarkConvergent(Value *V, IRBuilder<> &Builder,
                                         Module &M) {
-  Type *Ty = V->getType()->getScalarType();
+  Type *Ty = V->getType();
+  bool NeedVectorExpansion = false;
+  if (VectorType *VTy = dyn_cast<VectorType>(Ty))
+    if (!SupportsVectors || VTy->getNumElements() == 1) {
+      Ty = Ty->getScalarType();
+      NeedVectorExpansion = true;
+    }
+
   // Only work on vector/scalar types.
   if (Ty->isAggregateType() || Ty->isPointerTy())
     return;
   FunctionType *FT = FunctionType::get(Ty, Ty, false);
+
   std::string str = kConvergentFunctionPrefix;
   raw_string_ostream os(str);
   Ty->print(os);
   os.flush();
+
   Function *ConvF = cast<Function>(M.getOrInsertFunction(str, FT));
   ConvF->addFnAttr(Attribute::AttrKind::Convergent);
-  if (VectorType *VT = dyn_cast<VectorType>(V->getType())) {
+  if (NeedVectorExpansion) {
+    VectorType *VT = cast<VectorType>(V->getType());
     Value *ConvV = UndefValue::get(V->getType());
     std::vector<ExtractElementInst *> extractList(VT->getNumElements());
     for (unsigned i = 0; i < VT->getNumElements(); i++) {
