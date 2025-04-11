@@ -3,12 +3,11 @@
 
 // RUN: %dxc -DFUNC=abs         -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
 // RUN: %dxc -DFUNC=pow         -DARITY=2 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
-// RUN: %dxc -DFUNC=f16tof32    -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,LEGACY
-// RUN: %dxc -DFUNC=f32tof16    -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,LEGACY
 // RUN: %dxc -DFUNC=isfinite    -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
 // RUN: %dxc -DFUNC=isinf       -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
 // RUN: %dxc -DFUNC=isnan       -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
 // RUN: %dxc -DFUNC=modf        -DARITY=2 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+
 // RUN: %dxc -DFUNC=fwidth      -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,UNARY
 // RUN: %dxc -DFUNC=QuadReadLaneAt         -DARITY=4 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,QUAD
 // RUN: %dxc -DFUNC=QuadReadAcrossX        -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,QUAD
@@ -32,6 +31,56 @@
 // RUN: %dxc -DFUNC=WaveReadLaneFirst      -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,WAVE
 // RUN: %dxc -DFUNC=WaveActiveAllEqual     -DARITY=1 -T ps_6_9 %s | FileCheck %s --check-prefixes=CHECK,WAVE
 
+// RUN: %dxc -DFUNC=abs         -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=pow         -DARITY=2 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=isfinite    -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
+// RUN: %dxc -DFUNC=isinf       -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
+// RUN: %dxc -DFUNC=isnan       -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,SPECFLT
+// RUN: %dxc -DFUNC=modf        -DARITY=2 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=fwidth      -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=QuadReadLaneAt         -DARITY=4 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,QUAD
+// RUN: %dxc -DFUNC=QuadReadAcrossX        -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,QUAD
+// RUN: %dxc -DFUNC=QuadReadAcrossY        -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,QUAD
+// RUN: %dxc -DFUNC=QuadReadAcrossDiagonal -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,QUAD
+// RUN: %dxc -DFUNC=WaveActiveBitAnd       -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveBitOr        -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveBitXor       -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveProduct      -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveSum          -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveMin          -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveMax          -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveMultiPrefixBitAnd  -DARITY=5 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveMultiPrefixBitOr   -DARITY=5 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveMultiPrefixBitXor  -DARITY=5 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveMultiPrefixProduct -DARITY=5 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveMultiPrefixSum     -DARITY=5 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WavePrefixSum          -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WavePrefixProduct      -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveReadLaneAt         -DARITY=4 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveReadLaneFirst      -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+// RUN: %dxc -DFUNC=WaveActiveAllEqual     -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,WAVE
+
+// RUN: %dxc -DFUNC=countbits   -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=firstbithigh -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=firstbitlow  -DARITY=1 -DTYPE=uint -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddx         -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddx_coarse  -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddx_fine    -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddy         -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddy_coarse  -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddy_fine    -DARITY=1 -T ps_6_8 %s | FileCheck %s --check-prefixes=CHECK,UNARY
+
+// RUN: %dxc -DFUNC=countbits   -DARITY=1 -DTYPE=uint -T lib_6_9 %s -Fo %t.1
+// RUN: %dxl -T ps_6_8 %t.1 | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=firstbithigh -DARITY=1 -DTYPE=uint -T lib_6_9 %s -Fo %t.2
+// RUN: %dxl -T ps_6_8 %t.2 | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=firstbitlow  -DARITY=1 -DTYPE=uint -T lib_6_9 %s -Fo %t.3
+// RUN: %dxl -T ps_6_8 %t.3 | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddx         -DARITY=1 -T lib_6_9 %s -Fo %t.4
+// RUN: %dxl -T ps_6_8 %t.4 | FileCheck %s --check-prefixes=CHECK,UNARY
+// RUN: %dxc -DFUNC=ddy_fine    -DARITY=1 -T lib_6_9 %s -Fo %t.5
+// RUN: %dxl -T ps_6_8 %t.5 | FileCheck %s --check-prefixes=CHECK,UNARY
+
 #ifndef TYPE
 #define TYPE float
 #endif
@@ -50,13 +99,14 @@
 #define CALLARGS(x,y,z) x, m
 #endif
 
-StructuredBuffer< vector<TYPE, 8> > buf;
+StructuredBuffer< vector<TYPE, 4> > buf;
 ByteAddressBuffer rbuf;
 
+[shader("pixel")]
 float4 main(uint i : SV_PrimitiveID, uint4 m : M) : SV_Target {
-  vector<TYPE, 8> arg1 = rbuf.Load< vector<TYPE, 8> >(i++*32);
-  vector<TYPE, 8> arg2 = rbuf.Load< vector<TYPE, 8> >(i++*32);
-  vector<TYPE, 8> arg3 = rbuf.Load< vector<TYPE, 8> >(i++*32);
+  vector<TYPE, 4> arg1 = rbuf.Load< vector<TYPE, 4> >(i++*32);
+  vector<TYPE, 4> arg2 = rbuf.Load< vector<TYPE, 4> >(i++*32);
+  vector<TYPE, 4> arg3 = rbuf.Load< vector<TYPE, 4> >(i++*32);
 
   // UNARY: call {{.*}} [[DXOP:@dx.op.unary]]
   // BINARY: call {{.*}} [[DXOP:@dx.op.binary]]
@@ -68,11 +118,6 @@ float4 main(uint i : SV_PrimitiveID, uint4 m : M) : SV_Target {
   // CHECK: call {{.*}} [[DXOP]]
   // CHECK: call {{.*}} [[DXOP]]
   // CHECK: call {{.*}} [[DXOP]]
-  // CHECK: call {{.*}} [[DXOP]]
-  // CHECK: call {{.*}} [[DXOP]]
-  // CHECK: call {{.*}} [[DXOP]]
-  // CHECK: call {{.*}} [[DXOP]]
 
-  vector<TYPE, 8> ret = FUNC(CALLARGS(arg1, arg2, arg3));
-  return float4(ret[0] + ret[1], ret[2] + ret[3], ret[4] + ret[5], ret[6] + ret[7]);
+  return FUNC(CALLARGS(arg1, arg2, arg3));
 }

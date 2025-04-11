@@ -1,3 +1,7 @@
+// Test vector-enabled unary intrinsics that take float-like parameters and
+// and are "trivial" in that they can be implemented with a single call
+// instruction with the same parameter and return types.
+
 // RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=saturate  -DOP=7 -DNUM=7    %s | FileCheck %s
 // RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=saturate  -DOP=7 -DNUM=1022 %s | FileCheck %s
 // RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=cos  -DOP=12 -DNUM=7    %s | FileCheck %s
@@ -53,15 +57,29 @@
 // RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=ddy_fine -DOP=86 -DNUM=7    %s | FileCheck %s -check-prefixes=CHECK,CONV
 // RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=ddy_fine -DOP=86 -DNUM=1022 %s | FileCheck %s -check-prefixes=CHECK,CONV
 
-// Test vector-enabled unary intrinsics that take float-like parameters and
-// and are "trivial" in that they can be implemented with a single call
-// instruction with the same parameter and return types.
+// A smaller subset of representative linking tests.
+// RUN: %dxc -T lib_6_9 -enable-16bit-types -DFUNC=saturate  -DOP=7 -DNUM=1022 %s -Fo %t.1
+// RUN: %dxl -T cs_6_9 %t.1 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=cos  -DOP=12 -DNUM=7    %s -Fo %t.2
+// RUN: %dxl -T cs_6_9 %t.2 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=exp2 -DOP=21 -DNUM=1022 %s -Fo %t.3
+// RUN: %dxl -T cs_6_9 %t.3 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=frac -DOP=22 -DNUM=7    %s -Fo %t.4
+// RUN: %dxl -T cs_6_9 %t.4 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=log10 -DOP=23 -DNUM=1022 %s -Fo %t.5
+// RUN: %dxl -T cs_6_9 %t.5 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=sqrt -DOP=24 -DNUM=7    %s -Fo %t.6
+// RUN: %dxl -T cs_6_9 %t.6 | FileCheck %s
+// RUN: %dxc -T cs_6_9 -enable-16bit-types -DFUNC=ddx -DOP=83 -DNUM=7    %s -Fo %t.7
+// RUN: %dxl -T cs_6_9 %t.7 | FileCheck %s -check-prefixes=CHECK,CONV
+
 
 RWByteAddressBuffer buf;
 
 // CHECK-DAG: %dx.types.ResRet.[[HTY:v[0-9]*f16]] = type { <[[NUM:[0-9]*]] x half>
 // CHECK-DAG: %dx.types.ResRet.[[FTY:v[0-9]*f32]] = type { <[[NUM]] x float>
 
+[shader("compute")]
 [numthreads(8,1,1)]
 void main() {
 
