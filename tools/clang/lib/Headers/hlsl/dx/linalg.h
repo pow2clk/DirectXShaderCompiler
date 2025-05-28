@@ -73,33 +73,28 @@ _SPECIALIZE_ISUNSIGNED(half, false);
 // (RW)MatrixRef
 //
 
-template <typename BufferTy, DataType DT, uint M, uint K, MatrixLayout ML,
-          bool Transpose>
-struct MatrixRefImpl {
-  BufferTy Buffer;
+template <DataType DT, uint M, uint K, MatrixLayout ML, bool Transpose = false>
+struct MatrixRef {
+  ByteAddressBuffer Buffer;
   uint StartOffset;
   uint Stride;
 };
 
 template <DataType DT, uint M, uint K, MatrixLayout ML, bool Transpose = false>
-using MatrixRef = MatrixRefImpl<ByteAddressBuffer, DT, M, K, ML, Transpose>;
-
-template <DataType DT, uint M, uint K, MatrixLayout ML, bool Transpose = false>
-using RWMatrixRef = MatrixRefImpl<RWByteAddressBuffer, DT, M, K, ML, Transpose>;
+struct RWMatrixRef {
+  RWByteAddressBuffer Buffer;
+  uint StartOffset;
+  uint Stride;
+};
 
 //
 // (RW)VectorRef
 //
 
-template <typename BufferTy, DataType DT> struct VectorRefImpl {
-  BufferTy Buffer;
+template <DataType DT> struct VectorRef {
+  ByteAddressBuffer Buffer;
   uint StartOffset;
 };
-
-template <DataType DT> using VectorRef = VectorRefImpl<ByteAddressBuffer, DT>;
-
-template <DataType DT>
-using RWVectorRef = VectorRefImpl<RWByteAddressBuffer, DT>;
 
 //
 // Vector
@@ -120,13 +115,10 @@ InterpretedVector<T, N, DT> MakeInterpretedVector(vector<T, N> Vec) {
 //
 
 template <typename OutputElTy, typename InputElTy, int InputElCount,
-          typename MatrixBufferTy, DataType InputDT, DataType MatrixDT,
-          uint MatrixM, uint MatrixK, MatrixLayout MatrixLayout,
-          bool MatrixTranspose>
+          DataType InputDT, DataType MatrixDT, uint MatrixM, uint MatrixK,
+          MatrixLayout MatrixLayout, bool MatrixTranspose>
 vector<OutputElTy, MatrixM>
-Mul(MatrixRefImpl<MatrixBufferTy, MatrixDT, MatrixM, MatrixK, MatrixLayout,
-                  MatrixTranspose>
-        Matrix,
+Mul(MatrixRef<MatrixDT, MatrixM, MatrixK, MatrixLayout, MatrixTranspose> Matrix,
     InterpretedVector<InputElTy, InputElCount, InputDT> InputVector) {
 
   vector<OutputElTy, MatrixM> OutputVector;
@@ -145,16 +137,13 @@ Mul(MatrixRefImpl<MatrixBufferTy, MatrixDT, MatrixM, MatrixK, MatrixLayout,
 //
 
 template <typename OutputElTy, typename InputElTy, int InputElCount,
-          typename MatrixBufferTy, DataType InputDT, DataType MatrixDT,
-          uint MatrixM, uint MatrixK, MatrixLayout MatrixLayout,
-          bool MatrixTranspose, typename BiasVectorBufferTy,
+          DataType InputDT, DataType MatrixDT, uint MatrixM, uint MatrixK,
+          MatrixLayout MatrixLayout, bool MatrixTranspose,
           DataType BiasVectorDT>
-vector<OutputElTy, MatrixM>
-MulAdd(MatrixRefImpl<MatrixBufferTy, MatrixDT, MatrixM, MatrixK, MatrixLayout,
-                     MatrixTranspose>
-           Matrix,
-       InterpretedVector<InputElTy, InputElCount, InputDT> InputVector,
-       VectorRefImpl<BiasVectorBufferTy, BiasVectorDT> BiasVector) {
+vector<OutputElTy, MatrixM> MulAdd(
+    MatrixRef<MatrixDT, MatrixM, MatrixK, MatrixLayout, MatrixTranspose> Matrix,
+    InterpretedVector<InputElTy, InputElCount, InputDT> InputVector,
+    VectorRef<BiasVectorDT> BiasVector) {
 
   vector<OutputElTy, MatrixM> OutputVector;
 
