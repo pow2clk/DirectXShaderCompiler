@@ -845,6 +845,7 @@ int DxcContext::Compile() {
       llvm::StringRef TargetProfile = m_Opts.TargetProfile;
       const hlsl::ShaderModel *SM =
           hlsl::ShaderModel::GetByName(m_Opts.TargetProfile.str().c_str());
+      TargetProfile = hlsl::ShaderModel::Get(SM->GetKind(), 6, 9)->GetName();
       if (SM->IsValid() && SM->GetMajor() < 6) {
         TargetProfile = hlsl::ShaderModel::Get(SM->GetKind(), 6, 0)->GetName();
         std::string versionWarningString =
