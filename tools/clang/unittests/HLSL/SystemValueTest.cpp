@@ -146,6 +146,8 @@ public:
       break;
     case DXIL::ShaderKind::Library:
     case DXIL::ShaderKind::Invalid:
+      entry = L"INVALID";
+      profile = L"INVALID";
       assert(!"invalid shaderKind");
       break;
     }
