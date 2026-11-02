@@ -49,7 +49,7 @@
 // CHECK:  %gl_PrimitiveID = OpVariable %_ptr_Output__arr_int_uint_81 Output
 // CHECK:  %gl_Layer = OpVariable %_ptr_Output__arr_int_uint_81 Output
 // CHECK:  %gl_ViewportIndex = OpVariable %_ptr_Output__arr_int_uint_81 Output
-// CHECK:  [[cullprim]] = OpVariable %_ptr_Output__arr_int_uint_81 Output
+// CHECK:  [[cullprim]] = OpVariable %_ptr_Output__arr_bool_uint_81 Output
 // CHECK:  [[primshadingrate]] = OpVariable %_ptr_Output__arr_uint_uint_81 Output
 // CHECK:  %out_var_PRIM_USER = OpVariable %_ptr_Output__arr_v3float_uint_81 Output
 // CHECK:  %out_var_PRIM_USER_ARR = OpVariable %_ptr_Output__arr__arr_v4float_uint_2_uint_81 Output
@@ -70,7 +70,7 @@ struct MeshPerPrimitive {
     int primId : SV_PrimitiveID;                            // -> Builtin PrimitiveId
     int layer  : SV_RenderTargetArrayIndex;                 // -> Builtin Layer
     int vpIdx  : SV_ViewportArrayIndex;                     // -> Builtin ViewportIndex
-    int cullPrim : SV_CullPrimitive;                        // -> BUiltin CullPrimitiveEXT
+    bool cullPrim : SV_CullPrimitive;                       // -> BUiltin CullPrimitiveEXT
     uint shadingRate : SV_ShadingRate;                      // -> Builtin PrimitiveShadingRateEXT
     float3 userPrimAttr : PRIM_USER;
     float4 userPrimAttrArr[2] : PRIM_USER_ARR;
@@ -198,8 +198,8 @@ void main(
 // CHECK:  OpAccessChain %_ptr_Output_int %gl_ViewportIndex {{%[0-9]+}}
 // CHECK:  OpStore {{%[0-9]+}} %int_12
     prims[tig].vpIdx = 12;
-// CHECK:  OpAccessChain %_ptr_Output_int [[cullprim]] {{%[0-9]+}}
-// CHECK:  OpStore {{%[0-9]+}} %int_13
+// CHECK:  OpAccessChain %_ptr_Output_bool [[cullprim]] {{%[0-9]+}}
+// CHECK:  OpStore {{%[0-9]+}} %true
     prims[tig].cullPrim = 13;
 // CHECK:  OpAccessChain %_ptr_Output_uint [[primshadingrate]] {{%[0-9]+}}
 // CHECK:  OpStore {{%[0-9]+}} %uint_14

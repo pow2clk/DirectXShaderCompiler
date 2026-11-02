@@ -17738,6 +17738,57 @@ void WarnOnEntryAttrWithoutShaderAttr(Sema &S, FunctionDecl *FD) {
   return;
 }
 
+// Check a single semantic-annotated declaration (parameter or struct field) of
+// an entry point for system value type constraints.
+static void DiagnoseSVType(Sema &S, const DeclaratorDecl *D) {
+  SourceLocation Loc = D->getLocation();
+  QualType Ty = D->getType();
+  llvm::ArrayRef<hlsl::UnusualAnnotation *> Annots = D->getUnusualAnnotations();
+  for (const hlsl::UnusualAnnotation *UA : Annots) {
+    const auto *SD = dyn_cast<hlsl::SemanticDecl>(UA);
+    if (!SD)
+      continue;
+    llvm::StringRef BaseName;
+    uint32_t Index;
+    hlsl::Semantic::DecomposeNameAndIndex(SD->SemanticName, &BaseName, &Index);
+    const hlsl::Semantic *Sem = hlsl::Semantic::GetByName(BaseName);
+    if (Sem->GetKind() != hlsl::Semantic::Kind::CullPrimitive)
+      continue;
+    // Arrays are not allowed here, so the type must be a bool itself.
+    if (!Ty.getNonReferenceType().getUnqualifiedType()->isBooleanType())
+      S.Diags.Report(Loc, diag::err_hlsl_incorrect_sv_type)
+          << SD->SemanticName << "scalar bool" << D << Ty;
+  }
+}
+
+static void
+DiagnoseSVTypesInRecord(Sema &S, QualType Ty,
+                        llvm::SmallPtrSetImpl<const RecordDecl *> &Seen) {
+  while (const ArrayType *AT = S.Context.getAsArrayType(Ty))
+    Ty = AT->getElementType();
+  const RecordType *RT = Ty->getAs<RecordType>();
+  if (!RT || hlsl::IsHLSLResourceType(Ty) || hlsl::IsHLSLVecMatType(Ty))
+    return;
+  const RecordDecl *RD = RT->getDecl();
+  if (!RD->isCompleteDefinition() || !Seen.insert(RD).second)
+    return;
+  for (const FieldDecl *FD : RD->fields()) {
+    DiagnoseSVType(S, FD);
+    DiagnoseSVTypesInRecord(S, FD->getType(), Seen);
+  }
+}
+
+// Produce diagnostics for system value semantics on entry point parameters
+// that have invalid types. This runs in Sema so that it applies to all
+// targets (DXIL and SPIR-V).
+static void DiagnoseSVEntryParameters(Sema &S, FunctionDecl *FD) {
+  for (const ParmVarDecl *Param : FD->params()) {
+    DiagnoseSVType(S, Param);
+    llvm::SmallPtrSet<const RecordDecl *, 4> Seen;
+    DiagnoseSVTypesInRecord(S, Param->getType(), Seen);
+  }
+}
+
 // The DiagnoseEntry function does 2 things:
 // 1. Determine whether this function is the current entry point for a
 // non-library compilation, add an implicit shader attribute if so.
@@ -17775,6 +17826,8 @@ void DiagnoseEntry(Sema &S, FunctionDecl *FD) {
     hlsl::DiagnoseTypeElements(S, param->getLocation(), param->getType(),
                                DiagContext, DiagContext);
   }
+
+  DiagnoseSVEntryParameters(S, FD);
 
   const TypeDiagContext DiagContext = TypeDiagContext::EntryFunctionReturnType;
   DiagnoseTypeElements(S, FD->getLocation(), FD->getReturnType(), DiagContext,
